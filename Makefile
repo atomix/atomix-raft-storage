@@ -9,7 +9,7 @@ all: build
 
 build: # @HELP build the source code
 build: deps
-	GOOS=linux GOARCH=amd64 go build -o build/raft-storage-controller/_output/raft-storage-controller ./cmd/raft-storage-controller
+	GOOS=linux GOARCH=amd64 go build -o build/_output/raft-storage-controller ./cmd/raft-storage-controller
 
 
 deps: # @HELP ensure that the required dependencies are in place
@@ -40,7 +40,7 @@ proto:
 
 image: # @HELP build atomix storage controller Docker images
 image: build
-	docker build . -f build/raft-storage-controller/Dockerfile -t atomix/raft-storage-controller:${ATOMIX_RAFT_STORAGE_VERSION}
+	docker build . -f build/docker/Dockerfile -t atomix/raft-storage-controller:${ATOMIX_RAFT_STORAGE_VERSION}
 
 push: # @HELP push atomix-raft-node Docker image
 	docker push atomix/raft-storage-controller:${ATOMIX_RAFT_STORAGE_VERSION}
