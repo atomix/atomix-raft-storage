@@ -41,7 +41,6 @@ func printVersion() {
 }
 
 func main() {
-	fmt.Println("Main")
 	var namespace string
 	if len(os.Args) > 1 {
 		namespace = os.Args[1]
@@ -71,7 +70,6 @@ func main() {
 
 	// Create a new Cmd to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, manager.Options{Namespace: namespace})
-	fmt.Println("manager error", err)
 	if err != nil {
 		log.Error(err, "")
 		os.Exit(1)
@@ -85,16 +83,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("Added schemes")
-
 	// Setup the TestStorage controller
 	if err := controller.Add(mgr); err != nil {
-		fmt.Println("here", err)
 		log.Error(err, "")
 		os.Exit(1)
 	}
-
-	fmt.Println("added controller")
 
 	log.Info("Starting the Cmd.")
 
