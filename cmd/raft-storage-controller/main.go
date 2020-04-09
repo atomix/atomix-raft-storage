@@ -41,6 +41,7 @@ func printVersion() {
 }
 
 func main() {
+	logf.SetLogger(logf.ZapLogger(false))
 	var namespace string
 	if len(os.Args) > 1 {
 		namespace = os.Args[1]

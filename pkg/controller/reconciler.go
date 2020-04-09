@@ -28,9 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 var log = logf.Log.WithName("raft_controller")
@@ -38,6 +38,7 @@ var log = logf.Log.WithName("raft_controller")
 // Add creates a new Partition ManagementGroup and adds it to the Manager. The Manager will set fields on the ManagementGroup
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
+
 	log.Info("Add manager")
 	reconciler := &Reconciler{
 		client: mgr.GetClient(),
