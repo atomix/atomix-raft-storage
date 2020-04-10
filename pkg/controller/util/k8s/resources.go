@@ -19,32 +19,6 @@ import (
 )
 
 const (
-	appKey      = "app"
-	atomixApp   = "redis"
-	typeKey     = "type"
-	databaseKey = "database"
-	clusterKey  = "cluster"
-)
-
-const (
-	controllerAnnotation = "cloud.atomix.io/controller"
-	typeAnnotation       = "cloud.atomix.io/type"
-	databaseAnnotation   = "cloud.atomix.io/group"
-	clusterAnnotation    = "cloud.atomix.io/cluster"
-)
-
-const (
-	clusterType = "cluster"
-	proxyType   = "proxy"
-)
-
-const (
-	headlessServiceSuffix  = "hs"
-	disruptionBudgetSuffix = "pdb"
-	configSuffix           = "config"
-)
-
-const (
 	configPath         = "/etc/atomix"
 	clusterConfigFile  = "cluster.json"
 	protocolConfigFile = "protocol.json"
@@ -54,11 +28,6 @@ const (
 const (
 	configVolume = "config"
 	dataVolume   = "data"
-)
-
-const (
-	controllerNameVar      = "CONTROLLER_NAME"
-	controllerNamespaceVar = "CONTROLLER_NAMESPACE"
 )
 
 // newContainer returns a container for a node

@@ -18,6 +18,8 @@ import (
 	"context"
 	"fmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
 	"github.com/atomix/raft-storage-controller/pkg/controller"
 
 	"os"
@@ -28,9 +30,9 @@ import (
 	"github.com/atomix/raft-storage-controller/pkg/apis"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 var log = logf.Log.WithName("cmd")
@@ -41,7 +43,7 @@ func printVersion() {
 }
 
 func main() {
-	logf.SetLogger(logf.ZapLogger(false))
+	logf.SetLogger(zap.New())
 	var namespace string
 	if len(os.Args) > 1 {
 		namespace = os.Args[1]
