@@ -14,8 +14,8 @@ build: deps
 
 deps: # @HELP ensure that the required dependencies are in place
 	go build -v ./...
-	#bash -c "diff -u <(echo -n) <(git diff go.mod)"
-	#bash -c "diff -u <(echo -n) <(git diff go.sum)"
+	bash -c "diff -u <(echo -n) <(git diff go.mod)"
+	bash -c "diff -u <(echo -n) <(git diff go.sum)"
 
 test: # @HELP run the unit tests and source code validation
 test: build license_check linters
@@ -26,7 +26,7 @@ coverage: build linters license_check
 
 
 linters: # @HELP examines Go source code and reports coding problems
-	golangci-lint run
+	GOGC=50 golangci-lint run
 
 license_check: # @HELP examine and ensure license headers exist
 	./build/licensing/boilerplate.py -v
