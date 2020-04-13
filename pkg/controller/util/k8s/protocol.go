@@ -16,7 +16,9 @@ package k8s
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strconv"
 
 	api "github.com/atomix/api/proto/atomix/controller"
 	"github.com/atomix/kubernetes-controller/pkg/apis/cloud/v1beta2"
@@ -30,9 +32,11 @@ import (
 )
 
 const (
-	apiPort      = 5678
-	protocolPort = 5679
-	probePort    = 5679
+	apiPort            = 5678
+	protocolPort       = 5679
+	probePort          = 5679
+	databaseAnnotation = "cloud.atomix.io/database"
+	clusterAnnotation  = "cloud.atomix.io/cluster"
 )
 
 // NewClusterConfigMap returns a new ConfigMap for initializing Atomix clusters
@@ -70,8 +74,41 @@ func getPodDNSName(cluster *v1beta2.Cluster, pod int) string {
 	return fmt.Sprintf("%s-%d.%s.%s.svc.cluster.local", cluster.Name, pod, cluster.Name, cluster.Namespace)
 }
 
+// GetDatabaseFromClusterAnnotations returns the database name from the given cluster annotations
+func GetDatabaseFromClusterAnnotations(cluster *v1beta2.Cluster) (string, error) {
+	database, ok := cluster.Annotations[databaseAnnotation]
+	if !ok {
+		return "", errors.New("cluster missing database annotation")
+	}
+	return database, nil
+}
+
+// GetClusterIDFromClusterAnnotations returns the cluster ID from the given cluster annotations
+func GetClusterIDFromClusterAnnotations(cluster *v1beta2.Cluster) (int32, error) {
+	idstr, ok := cluster.Annotations[clusterAnnotation]
+	if !ok {
+		return 1, nil
+	}
+
+	id, err := strconv.ParseInt(idstr, 0, 32)
+	if err != nil {
+		return 0, err
+	}
+	return int32(id), nil
+}
+
 // newNodeConfigString creates a node configuration string for the given cluster
 func newNodeConfigString(cluster *v1beta2.Cluster, storage *storage.RaftStorageClass) (string, error) {
+	clusterID, err := GetClusterIDFromClusterAnnotations(cluster)
+	if err != nil {
+		return "", err
+	}
+
+	clusterDatabase, err := GetDatabaseFromClusterAnnotations(cluster)
+	if err != nil {
+		return "", err
+	}
+
 	members := make([]*api.MemberConfig, storage.Spec.Replicas)
 	for i := 0; i < int(storage.Spec.Replicas); i++ {
 		members[i] = &api.MemberConfig{
@@ -82,8 +119,24 @@ func newNodeConfigString(cluster *v1beta2.Cluster, storage *storage.RaftStorageC
 		}
 	}
 
+	partitions := make([]*api.PartitionId, 0, cluster.Spec.Partitions)
+	for partitionID := (cluster.Spec.Partitions * (clusterID - 1)) + 1; partitionID <= cluster.Spec.Partitions*clusterID; partitionID++ {
+		partition := &api.PartitionId{
+			Partition: partitionID,
+			Cluster: &api.ClusterId{
+				ID: int32(clusterID),
+				DatabaseID: &api.DatabaseId{
+					Name:      clusterDatabase,
+					Namespace: cluster.Namespace,
+				},
+			},
+		}
+		partitions = append(partitions, partition)
+	}
+
 	config := &api.ClusterConfig{
-		Members: members,
+		Members:    members,
+		Partitions: partitions,
 	}
 
 	marshaller := jsonpb.Marshaler{}
