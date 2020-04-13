@@ -1,6 +1,6 @@
 clusters: 3
 partitions: 10
-replicas: 2
+replicas: 3
 
 image:
   repository: atomix/raft-replica
