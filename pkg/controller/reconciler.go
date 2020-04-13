@@ -102,6 +102,11 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		return reconcile.Result{}, err
 	}
 
+	err = r.reconcileService(cluster, storage)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	err = r.reconcileStatus(cluster, storage)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -133,6 +138,20 @@ func (r *Reconciler) reconcileStatefulSet(cluster *v1beta2.Cluster, storage *v1b
 	err := r.client.Get(context.TODO(), name, statefulSet)
 	if err != nil && k8serrors.IsNotFound(err) {
 		err = r.addStatefulSet(cluster, storage)
+	}
+	return err
+}
+
+func (r *Reconciler) reconcileService(cluster *v1beta2.Cluster, storage *v1beta1.RaftStorageClass) error {
+	log.Info("Reconcile raft storage service")
+	service := &corev1.Service{}
+	name := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name,
+	}
+	err := r.client.Get(context.TODO(), name, service)
+	if err != nil && k8serrors.IsNotFound(err) {
+		err = r.addService(cluster, storage)
 	}
 	return err
 }

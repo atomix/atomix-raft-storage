@@ -23,6 +23,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+func (r *Reconciler) addService(cluster *v1beta2.Cluster, storage *v1beta1.RaftStorageClass) error {
+	log.Info("Creating raft service", "Name", cluster.Name, "Namespace", cluster.Namespace)
+	service := k8s.NewClusterService(cluster)
+	if err := controllerutil.SetControllerReference(storage, service, r.scheme); err != nil {
+		return err
+	}
+	return r.client.Create(context.TODO(), service)
+
+}
+
 func (r *Reconciler) addHeadlessService(cluster *v1beta2.Cluster, storage *v1beta1.RaftStorageClass) error {
 	log.Info("Creating headless raft service", "Name", cluster.Name, "Namespace", cluster.Namespace)
 	service := k8s.NewClusterHeadlessService(cluster)

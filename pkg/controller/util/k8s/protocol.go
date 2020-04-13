@@ -31,14 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-const (
-	apiPort            = 5678
-	protocolPort       = 5679
-	probePort          = 5679
-	databaseAnnotation = "cloud.atomix.io/database"
-	clusterAnnotation  = "cloud.atomix.io/cluster"
-)
-
 // NewClusterConfigMap returns a new ConfigMap for initializing Atomix clusters
 func NewClusterConfigMap(cluster *v1beta2.Cluster, storage *storage.RaftStorageClass, config interface{}) (*corev1.ConfigMap, error) {
 	clusterConfig, err := newNodeConfigString(cluster, storage)
@@ -64,6 +56,16 @@ func NewClusterConfigMap(cluster *v1beta2.Cluster, storage *storage.RaftStorageC
 	}, nil
 }
 
+// getClusterResourceName returns the given resource name for the given cluster
+func getClusterResourceName(cluster *v1beta2.Cluster, resource string) string {
+	return fmt.Sprintf("%s-%s", cluster.Name, resource)
+}
+
+// GetClusterHeadlessServiceName returns the headless service name for the given cluster
+func GetClusterHeadlessServiceName(cluster *v1beta2.Cluster) string {
+	return getClusterResourceName(cluster, headlessServiceSuffix)
+}
+
 // getPodName returns the name of the pod for the given pod ID
 func getPodName(cluster *v1beta2.Cluster, pod int) string {
 	return fmt.Sprintf("%s-%d", cluster.Name, pod)
@@ -71,7 +73,7 @@ func getPodName(cluster *v1beta2.Cluster, pod int) string {
 
 // getPodDNSName returns the fully qualified DNS name for the given pod ID
 func getPodDNSName(cluster *v1beta2.Cluster, pod int) string {
-	return fmt.Sprintf("%s-%d.%s.%s.svc.cluster.local", cluster.Name, pod, cluster.Name, cluster.Namespace)
+	return fmt.Sprintf("%s-%d.%s.%s.svc.cluster.local", cluster.Name, pod, GetClusterHeadlessServiceName(cluster), cluster.Namespace)
 }
 
 // GetDatabaseFromClusterAnnotations returns the database name from the given cluster annotations
@@ -166,11 +168,31 @@ func NewClusterDisruptionBudget(cluster *v1beta2.Cluster, storage *storage.RaftS
 	}
 }
 
+// NewClusterService returns a new service for a cluster
+func NewClusterService(cluster *v1beta2.Cluster) *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+			Labels:    cluster.Labels,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name: "api",
+					Port: apiPort,
+				},
+			},
+			Selector: cluster.Labels,
+		},
+	}
+}
+
 // NewClusterHeadlessService returns a new headless service for a cluster group
 func NewClusterHeadlessService(cluster *v1beta2.Cluster) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cluster.Name,
+			Name:      GetClusterHeadlessServiceName(cluster),
 			Namespace: cluster.Namespace,
 			Labels:    cluster.Labels,
 			Annotations: map[string]string{
@@ -239,11 +261,11 @@ func NewStatefulSet(cluster *v1beta2.Cluster, storage *storage.RaftStorageClass)
 
 	apiContainerPort := corev1.ContainerPort{
 		Name:          "api",
-		ContainerPort: 5678,
+		ContainerPort: apiPort,
 	}
 	protocolContainerPort := corev1.ContainerPort{
 		Name:          "protocol",
-		ContainerPort: 5679,
+		ContainerPort: protocolPort,
 	}
 
 	containerBuilder := NewContainer()
@@ -264,7 +286,7 @@ func NewStatefulSet(cluster *v1beta2.Cluster, storage *storage.RaftStorageClass)
 			Labels:    cluster.Labels,
 		},
 		Spec: appsv1.StatefulSetSpec{
-			ServiceName: cluster.Name,
+			ServiceName: GetClusterHeadlessServiceName(cluster),
 			Replicas:    &storage.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: cluster.Labels,
