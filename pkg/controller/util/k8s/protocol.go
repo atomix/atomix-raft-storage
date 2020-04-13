@@ -142,8 +142,8 @@ func NewClusterHeadlessService(cluster *v1beta2.Cluster) *corev1.Service {
 	}
 }
 
-// NewBackendStatefulSet returns a new StatefulSet for a cluster group
-func NewBackendStatefulSet(cluster *v1beta2.Cluster, storage *storage.RaftStorageClass) (*appsv1.StatefulSet, error) {
+// NewStatefulSet returns a new StatefulSet for a cluster group
+func NewStatefulSet(cluster *v1beta2.Cluster, storage *storage.RaftStorageClass) (*appsv1.StatefulSet, error) {
 	volumes := []corev1.Volume{
 		newConfigVolume(cluster.Name),
 	}

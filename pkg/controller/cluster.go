@@ -34,7 +34,7 @@ func (r *Reconciler) addHeadlessService(cluster *v1beta2.Cluster, storage *v1bet
 
 func (r *Reconciler) addStatefulSet(cluster *v1beta2.Cluster, storage *v1beta1.RaftStorageClass) error {
 	log.Info("Creating raft replicas", "Name", cluster.Name, "Namespace", cluster.Namespace)
-	set, err := k8s.NewBackendStatefulSet(cluster, storage)
+	set, err := k8s.NewStatefulSet(cluster, storage)
 	if err != nil {
 		return err
 	}

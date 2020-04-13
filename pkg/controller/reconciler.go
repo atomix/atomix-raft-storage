@@ -125,12 +125,12 @@ func (r *Reconciler) reconcileConfigMap(cluster *v1beta2.Cluster, storage *v1bet
 
 func (r *Reconciler) reconcileStatefulSet(cluster *v1beta2.Cluster, storage *v1beta1.RaftStorageClass) error {
 	log.Info("Reconcile raft storage stateful set")
-	dep := &appsv1.Deployment{}
+	statefulSet := &appsv1.StatefulSet{}
 	name := types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Name,
 	}
-	err := r.client.Get(context.TODO(), name, dep)
+	err := r.client.Get(context.TODO(), name, statefulSet)
 	if err != nil && k8serrors.IsNotFound(err) {
 		err = r.addStatefulSet(cluster, storage)
 	}
@@ -152,12 +152,12 @@ func (r *Reconciler) reconcileHeadlessService(cluster *v1beta2.Cluster, storage 
 }
 
 func (r *Reconciler) reconcileStatus(cluster *v1beta2.Cluster, storage *v1beta1.RaftStorageClass) error {
-	dep := &appsv1.Deployment{}
+	statefulSet := &appsv1.StatefulSet{}
 	name := types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Name,
 	}
-	err := r.client.Get(context.TODO(), name, dep)
+	err := r.client.Get(context.TODO(), name, statefulSet)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			return nil
@@ -166,7 +166,7 @@ func (r *Reconciler) reconcileStatus(cluster *v1beta2.Cluster, storage *v1beta1.
 	}
 
 	if cluster.Status.ReadyPartitions < cluster.Spec.Partitions &&
-		dep.Status.ReadyReplicas == dep.Status.Replicas {
+		statefulSet.Status.ReadyReplicas == statefulSet.Status.Replicas {
 		clusterID, err := k8s.GetClusterIDFromClusterAnnotations(cluster)
 		if err != nil {
 			return err
