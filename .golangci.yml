@@ -1,0 +1,23 @@
+linters:
+  enable:
+    - gofmt
+    - gocyclo
+    - golint
+    - misspell
+    - typecheck
+    - typecheck
+    - errcheck
+issues:
+  exclude-use-default: false
+  exclude:
+    - Error return value of `.*Close` is not checked
+    - Error return value of `.*Flush` is not checked
+    - Error return value of `.*Start` is not checked
+    - Error return value of `.*Stop` is not checked
+    - Error return value of `.*Write` is not checked
+
+run:
+  skip-dirs:
+    - pkg/apis/v1beta1/*
+  skip-files:
+    - pkg/apis/v1beta1/zz_generated.deepcopy.go
