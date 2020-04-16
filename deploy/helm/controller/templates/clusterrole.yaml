@@ -1,6 +1,6 @@
-{{- if eq (.Values.scope | lower) "namespace" }}
+{{- if eq (.Values.scope | lower) "cluster" }}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   creationTimestamp: null
   name: {{ .Release.Name }}

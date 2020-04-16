@@ -1,3 +1,5 @@
+replicas: 1
+scope: Cluster
 image:
   repository: atomix/raft-storage-controller
   tag: latest
