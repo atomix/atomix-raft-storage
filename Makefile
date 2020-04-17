@@ -3,7 +3,11 @@ export GO111MODULE=on
 
 .PHONY: build
 
+ifdef VERSION
+ATOMIX_RAFT_STORAGE_VERSION := $(VERSION)
+else
 ATOMIX_RAFT_STORAGE_VERSION := latest
+endif
 
 all: build
 
