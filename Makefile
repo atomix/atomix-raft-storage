@@ -31,8 +31,7 @@ linters: # @HELP examines Go source code and reports coding problems
 	GOGC=50 golangci-lint run
 
 license_check: # @HELP examine and ensure license headers exist
-	@if [ ! -d "../build-tools" ]; then cd .. && git clone https://github.com/onosproject/build-tools.git; fi
-	./../build-tools/licensing/boilerplate.py -v --rootdir=${CURDIR}
+	./build/bin/license-check
 
 proto: # @HELP build Protobuf/gRPC generated types
 proto:
