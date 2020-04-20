@@ -30,6 +30,8 @@ github.com/atomix/api v0.0.0-20200202100958-13b24edbe32d h1:rM+AnOZfgosBZzvkbZUb
 github.com/atomix/api v0.0.0-20200202100958-13b24edbe32d/go.mod h1:Ec7OEwfv1qGASdRZdXxi6TUvwmayT4IkkewDcm7pItI=
 github.com/atomix/kubernetes-controller v0.2.0-beta.1 h1:NYOBbwXHrBNQs6YmXQV1eHZkdO+ViZwvTpZwE0CtYj8=
 github.com/atomix/kubernetes-controller v0.2.0-beta.1/go.mod h1:lWOxAfXoCF7O1Gu/ZAEYdg8QJAc3BFRyvyQQ5WsXy+E=
+github.com/atomix/kubernetes-controller v0.2.0-beta.4 h1:OZRN8znnKFOZOLdA1MiHPXDbZR5vlZ3xyCSwGbyZz1Y=
+github.com/atomix/kubernetes-controller v0.2.0-beta.4/go.mod h1:lWOxAfXoCF7O1Gu/ZAEYdg8QJAc3BFRyvyQQ5WsXy+E=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0 h1:HWo1m869IqiPhD389kmkxeTalrjNbbJTC8LXupb+sl0=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
