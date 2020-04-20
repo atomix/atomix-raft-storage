@@ -26,17 +26,16 @@ import (
 func (r *Reconciler) addService(cluster *v1beta2.Cluster, storage *v1beta1.RaftStorageClass) error {
 	log.Info("Creating raft service", "Name", cluster.Name, "Namespace", cluster.Namespace)
 	service := k8s.NewClusterService(cluster)
-	if err := controllerutil.SetControllerReference(storage, service, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(cluster, service, r.scheme); err != nil {
 		return err
 	}
 	return r.client.Create(context.TODO(), service)
-
 }
 
 func (r *Reconciler) addHeadlessService(cluster *v1beta2.Cluster, storage *v1beta1.RaftStorageClass) error {
 	log.Info("Creating headless raft service", "Name", cluster.Name, "Namespace", cluster.Namespace)
 	service := k8s.NewClusterHeadlessService(cluster)
-	if err := controllerutil.SetControllerReference(storage, service, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(cluster, service, r.scheme); err != nil {
 		return err
 	}
 	return r.client.Create(context.TODO(), service)
@@ -48,10 +47,9 @@ func (r *Reconciler) addStatefulSet(cluster *v1beta2.Cluster, storage *v1beta1.R
 	if err != nil {
 		return err
 	}
-	if err := controllerutil.SetControllerReference(storage, set, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(cluster, set, r.scheme); err != nil {
 		return err
 	}
-
 	return r.client.Create(context.TODO(), set)
 }
 
@@ -63,7 +61,7 @@ func (r *Reconciler) addConfigMap(cluster *v1beta2.Cluster, storage *v1beta1.Raf
 	if err != nil {
 		return err
 	}
-	if err := controllerutil.SetControllerReference(storage, cm, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(cluster, cm, r.scheme); err != nil {
 		return err
 	}
 	return r.client.Create(context.TODO(), cm)
