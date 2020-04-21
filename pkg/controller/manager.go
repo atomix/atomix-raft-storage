@@ -80,6 +80,8 @@ type clusterMapper struct {
 }
 
 func (m *clusterMapper) Map(object handler.MapObject) []reconcile.Request {
+	log.Info("Filter RaftStorageClass", "Namespace", object.Meta.GetNamespace(), "Name", object.Meta.GetName())
+
 	// Find all databases that reference the changed storage
 	databases := &v1beta3.DatabaseList{}
 	err := m.client.List(context.TODO(), databases, &client.ListOptions{})
@@ -93,7 +95,10 @@ func (m *clusterMapper) Map(object handler.MapObject) []reconcile.Request {
 		if (database.Spec.StorageClass.Group == "" || database.Spec.StorageClass.Group == v1beta1.RaftStorageClassGroup) &&
 			(database.Spec.StorageClass.Version == "" || database.Spec.StorageClass.Version == v1beta1.RaftStorageClassVersion) &&
 			(database.Spec.StorageClass.Kind == "" || database.Spec.StorageClass.Kind == v1beta1.RaftStorageClassKind) &&
+			((database.Spec.StorageClass.Namespace == "" && database.Namespace == object.Meta.GetNamespace()) ||
+				(database.Spec.StorageClass.Namespace != "" && database.Spec.StorageClass.Namespace == object.Meta.GetNamespace())) &&
 			database.Spec.StorageClass.Name == object.Meta.GetName() {
+			log.Info("Matched RaftStorageClass", "Namespace", object.Meta.GetNamespace(), "Name", object.Meta.GetName())
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: database.GetNamespace(),
@@ -112,6 +117,7 @@ type storageFilter struct {
 }
 
 func (m *storageFilter) Map(object handler.MapObject) []reconcile.Request {
+	log.Info("Filter Database", "Namespace", object.Meta.GetNamespace(), "Name", object.Meta.GetName())
 	database := object.Object.(*v1beta3.Database)
 
 	// If the Cluster references a RaftStorageClass, enqueue the request
@@ -128,6 +134,7 @@ func (m *storageFilter) Map(object handler.MapObject) []reconcile.Request {
 			Name:      database.Spec.StorageClass.Name,
 		}
 		if err := m.client.Get(context.TODO(), name, storageClass); err == nil {
+			log.Error(err, "Matched Database", "Namespace", object.Meta.GetNamespace(), "Name", object.Meta.GetName())
 			return []reconcile.Request{
 				{
 					NamespacedName: types.NamespacedName{
@@ -136,6 +143,8 @@ func (m *storageFilter) Map(object handler.MapObject) []reconcile.Request {
 					},
 				},
 			}
+		} else {
+			log.Error(err, "Filter Database", "Namespace", object.Meta.GetNamespace(), "Name", object.Meta.GetName())
 		}
 	}
 	return []reconcile.Request{}

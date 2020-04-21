@@ -15,13 +15,13 @@
 package apis
 
 import (
-	atomixv1beta2 "github.com/atomix/kubernetes-controller/pkg/apis/cloud/v1beta3"
+	atomixv1beta3 "github.com/atomix/kubernetes-controller/pkg/apis/cloud/v1beta3"
 	raftv1beta1 "github.com/atomix/raft-storage-controller/pkg/apis/storage/v1beta1"
 )
 
 func init() {
 	// register the types with the Scheme so the components can map objects to GroupVersionKinds and back
-	AddToSchemes = append(AddToSchemes, atomixv1beta2.SchemeBuilder.AddToScheme)
+	AddToSchemes = append(AddToSchemes, atomixv1beta3.SchemeBuilder.AddToScheme)
 	AddToSchemes = append(AddToSchemes, raftv1beta1.SchemeBuilder.AddToScheme)
 
 }

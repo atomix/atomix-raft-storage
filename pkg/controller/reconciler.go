@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"math"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -75,12 +76,14 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	database := &v1beta3.Database{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, database)
 	if err != nil {
+		log.Error(err, "Reconcile Database")
 		if k8serrors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{Requeue: true}, err
 	}
 
+	log.Info("Reconcile RaftStorageClass")
 	storage := &v1beta1.RaftStorageClass{}
 	namespace := database.Spec.StorageClass.Namespace
 	if namespace == "" {
@@ -92,31 +95,38 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	}
 	err = r.client.Get(context.TODO(), name, storage)
 	if err != nil {
+		log.Error(err, "Reconcile RaftStorageClass")
 		if k8serrors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{Requeue: true}, err
 	}
 
+	log.Info("Reconcile Clusters")
 	err = r.reconcileClusters(database, storage)
 	if err != nil {
+		log.Error(err, "Reconcile Clusters")
 		return reconcile.Result{}, err
 	}
 
+	log.Info("Reconcile Partitions")
 	err = r.reconcilePartitions(database, storage)
 	if err != nil {
+		log.Error(err, "Reconcile Partitions")
 		return reconcile.Result{}, err
 	}
 
+	log.Info("Reconcile Status")
 	err = r.reconcileStatus(database, storage)
 	if err != nil {
+		log.Error(err, "Reconcile Status")
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
 }
 
 func (r *Reconciler) reconcileClusters(database *v1beta3.Database, storage *v1beta1.RaftStorageClass) error {
-	clusters := int(database.Spec.Partitions / storage.Spec.PartitionsPerCluster)
+	clusters := getClusters(database, storage)
 	for cluster := 1; cluster <= clusters; cluster++ {
 		err := r.reconcileCluster(database, storage, cluster)
 		if err != nil {
@@ -202,10 +212,9 @@ func newNodeConfigString(database *v1beta3.Database, storage *v1beta1.RaftStorag
 		}
 	}
 
-	clusters := int(database.Spec.Partitions / storage.Spec.PartitionsPerCluster)
 	partitions := make([]*api.PartitionId, 0, database.Spec.Partitions)
 	for partitionID := 1; partitionID <= int(database.Spec.Partitions); partitionID++ {
-		if (partitionID%clusters + 1) == cluster {
+		if getClusterForPartitionID(database, storage, partitionID) == cluster {
 			partition := &api.PartitionId{
 				Partition: int32(partitionID),
 				Cluster: &api.ClusterId{
@@ -455,8 +464,7 @@ func (r *Reconciler) reconcilePartition(database *v1beta3.Database, storage *v1b
 		return err
 	}
 
-	clusters := database.Spec.Partitions / storage.Spec.PartitionsPerCluster
-	cluster := int(partition.Spec.PartitionID%clusters) + 1
+	cluster := getClusterForPartition(database, storage, &partition)
 	service = &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   partition.Namespace,
@@ -491,8 +499,7 @@ func (r *Reconciler) reconcileStatus(database *v1beta3.Database, storage *v1beta
 	for _, partition := range partitions.Items {
 		if !partition.Status.Ready {
 			log.Info("Reconcile status", "Database", database.Name, "Partition", partition.Name, "ReadyPartitions")
-			clusters := database.Spec.Partitions / storage.Spec.PartitionsPerCluster
-			cluster := int(partition.Spec.PartitionID%clusters) + 1
+			cluster := getClusterForPartition(database, storage, &partition)
 
 			statefulSet := &appsv1.StatefulSet{}
 			name := types.NamespacedName{
@@ -518,6 +525,29 @@ func (r *Reconciler) reconcileStatus(database *v1beta3.Database, storage *v1beta
 		}
 	}
 	return nil
+}
+
+// getClusters returns the number of clusters in the given database
+func getClusters(database *v1beta3.Database, storage *v1beta1.RaftStorageClass) int {
+	partitions := database.Spec.Partitions
+	if partitions == 0 {
+		partitions = 1
+	}
+	partitionsPerCluster := storage.Spec.PartitionsPerCluster
+	if partitionsPerCluster == 0 {
+		partitionsPerCluster = 1
+	}
+	return int(math.Ceil(float64(partitions) / float64(partitionsPerCluster)))
+}
+
+// getClusterForPartition returns the cluster ID for the given partition ID
+func getClusterForPartition(database *v1beta3.Database, storage *v1beta1.RaftStorageClass, partition *v1beta3.Partition) int {
+	return getClusterForPartitionID(database, storage, int(partition.Spec.PartitionID))
+}
+
+// getClusterForPartitionID returns the cluster ID for the given partition ID
+func getClusterForPartitionID(database *v1beta3.Database, storage *v1beta1.RaftStorageClass, partition int) int {
+	return (partition % getClusters(database, storage)) + 1
 }
 
 // getClusterResourceName returns the given resource name for the given cluster

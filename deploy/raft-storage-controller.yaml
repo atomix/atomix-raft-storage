@@ -33,6 +33,9 @@ spec:
                   max: 9
                 partitionsPerCluster:
                   type: integer
+                  min: 1
+                  max: 1024
+                  default: 1
 
 ---
 apiVersion: cloud.atomix.io/v1beta2
