@@ -29,7 +29,10 @@ spec:
                   type: string
                 replicas:
                   type: integer
-
+                  min: 1
+                  max: 9
+                partitionsPerCluster:
+                  type: integer
 
 ---
 apiVersion: cloud.atomix.io/v1beta2

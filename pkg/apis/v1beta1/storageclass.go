@@ -30,6 +30,9 @@ const RaftStorageClassKind = "RaftStorageClass"
 
 // RaftStorageClassSpec defines the desired state of RaftStorageClass
 type RaftStorageClassSpec struct {
+	// PartitionsPerCluster is the number of partitions to store in each RaftCluster
+	PartitionsPerCluster int32 `json:"partitionsPerCluster,omitempty"`
+
 	// Replicas is the number of raft replicas
 	Replicas int32 `json:"replicas,omitempty"`
 
@@ -40,11 +43,6 @@ type RaftStorageClassSpec struct {
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 }
 
-// RaftStorageClassStatus defines the observed state of RaftStorageClass
-type RaftStorageClassStatus struct {
-	Ready bool `json:"ready,omitempty"`
-}
-
 // +kubebuilder:object:root=true
 
 // RaftStorageClass is the Schema for the raftstorageclasses API
@@ -53,7 +51,6 @@ type RaftStorageClass struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   RaftStorageClassSpec   `json:"spec,omitempty"`
-	Status RaftStorageClassStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -1,9 +1,0 @@
-clusters: 3
-partitions: 10
-replicas: 3
-
-image:
-  repository: atomix/raft-replica
-  tag: latest
-  pullPolicy: IfNotPresent
-  pullSecrets: []
