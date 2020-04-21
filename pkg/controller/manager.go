@@ -133,7 +133,9 @@ func (m *storageFilter) Map(object handler.MapObject) []reconcile.Request {
 			Namespace: namespace,
 			Name:      database.Spec.StorageClass.Name,
 		}
-		if err := m.client.Get(context.TODO(), name, storageClass); err == nil {
+		if err := m.client.Get(context.TODO(), name, storageClass); err != nil {
+			log.Error(err, "Filter Database", "Namespace", object.Meta.GetNamespace(), "Name", object.Meta.GetName())
+		} else {
 			log.Error(err, "Matched Database", "Namespace", object.Meta.GetNamespace(), "Name", object.Meta.GetName())
 			return []reconcile.Request{
 				{
@@ -143,8 +145,6 @@ func (m *storageFilter) Map(object handler.MapObject) []reconcile.Request {
 					},
 				},
 			}
-		} else {
-			log.Error(err, "Filter Database", "Namespace", object.Meta.GetNamespace(), "Name", object.Meta.GetName())
 		}
 	}
 	return []reconcile.Request{}
