@@ -1,4 +1,4 @@
-// Copyright 2020-present Open Networking Foundation.
+// Copyright 2019-present Open Networking Foundation.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,16 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package apis
-
-import (
-	atomixv1beta2 "github.com/atomix/kubernetes-controller/pkg/apis/cloud/v1beta3"
-	raftv1beta1 "github.com/atomix/raft-storage-controller/pkg/apis/storage/v1beta1"
-)
-
-func init() {
-	// register the types with the Scheme so the components can map objects to GroupVersionKinds and back
-	AddToSchemes = append(AddToSchemes, atomixv1beta2.SchemeBuilder.AddToScheme)
-	AddToSchemes = append(AddToSchemes, raftv1beta1.SchemeBuilder.AddToScheme)
-
-}
+// Package v1beta1 contains API Schema definitions for the cloud v1beta1 API group
+// +k8s:deepcopy-gen=package,register
+// +groupName=storage.cloud.atomix.io
+package v1beta1

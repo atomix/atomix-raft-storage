@@ -13,8 +13,8 @@
 // limitations under the License.
 
 // Package v1beta1 contains API Schema definitions for the storage.cloud.atomix.io v1beta1 API group
-// +kubebuilder:object:generate=true
-// +groupName=storage.cloud.atomix.io.my.domain
+// +k8s:deepcopy-gen=package,register
+// +groupName=storage.cloud.atomix.io
 package v1beta1
 
 import (

@@ -17,7 +17,7 @@ package controller
 import (
 	"context"
 	"github.com/atomix/kubernetes-controller/pkg/apis/cloud/v1beta3"
-	"github.com/atomix/raft-storage-controller/pkg/apis/v1beta1"
+	"github.com/atomix/raft-storage-controller/pkg/apis/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"

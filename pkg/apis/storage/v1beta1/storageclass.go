@@ -43,9 +43,11 @@ type RaftStorageClassSpec struct {
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 }
 
-// +kubebuilder:object:root=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RaftStorageClass is the Schema for the raftstorageclasses API
+// +k8s:openapi-gen=true
 type RaftStorageClass struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -53,7 +55,7 @@ type RaftStorageClass struct {
 	Spec   RaftStorageClassSpec   `json:"spec,omitempty"`
 }
 
-// +kubebuilder:object:root=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RaftStorageClassList contains a list of RaftStorageClass
 type RaftStorageClassList struct {
