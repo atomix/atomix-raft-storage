@@ -18,6 +18,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
+
 	api "github.com/atomix/api/proto/atomix/controller"
 	"github.com/atomix/kubernetes-controller/pkg/apis/cloud/v1beta3"
 	"github.com/atomix/kubernetes-controller/pkg/controller/util/k8s"
@@ -31,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"math"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -159,7 +160,7 @@ func (r *Reconciler) reconcileConfigMap(database *v1beta3.Database, storage *v1b
 	cm := &corev1.ConfigMap{}
 	name := types.NamespacedName{
 		Namespace: database.Namespace,
-		Name:      database.Name,
+		Name:      getClusterName(database, cluster),
 	}
 	err := r.client.Get(context.TODO(), name, cm)
 	if err != nil && k8serrors.IsNotFound(err) {
@@ -252,7 +253,7 @@ func (r *Reconciler) reconcileStatefulSet(database *v1beta3.Database, storage *v
 	statefulSet := &appsv1.StatefulSet{}
 	name := types.NamespacedName{
 		Namespace: database.Namespace,
-		Name:      database.Name,
+		Name:      getClusterName(database, cluster),
 	}
 	err := r.client.Get(context.TODO(), name, statefulSet)
 	if err != nil && k8serrors.IsNotFound(err) {
@@ -498,7 +499,7 @@ func (r *Reconciler) reconcileStatus(database *v1beta3.Database, storage *v1beta
 
 	for _, partition := range partitions.Items {
 		if !partition.Status.Ready {
-			log.Info("Reconcile status", "Database", database.Name, "Partition", partition.Name, "ReadyPartitions")
+			log.Info("Reconcile status", "Database", database.Name, "Partition", partition.Name, "Ready", partition.Status.Ready)
 			cluster := getClusterForPartition(database, storage, &partition)
 
 			statefulSet := &appsv1.StatefulSet{}
