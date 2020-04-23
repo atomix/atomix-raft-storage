@@ -262,6 +262,34 @@ func (r *Reconciler) reconcileStatefulSet(database *v1beta3.Database, storage *v
 	return err
 }
 
+func newDataVolume(database *v1beta3.Database, storage *v1beta1.RaftStorageClass, cluster int) corev1.Volume {
+	dataVolume := corev1.Volume{
+		Name: dataVolume,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+
+	return dataVolume
+
+}
+
+func newConfigVolume(database *v1beta3.Database, storage *v1beta1.RaftStorageClass, cluster int) corev1.Volume {
+	configVolume := corev1.Volume{
+
+		Name: configVolume,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: getClusterName(database, cluster),
+				},
+			},
+		},
+	}
+	return configVolume
+
+}
+
 func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1.RaftStorageClass, cluster int) error {
 	log.Info("Creating raft replicas", "Name", database.Name, "Namespace", database.Namespace)
 
@@ -272,6 +300,18 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 	pullPolicy := storage.Spec.ImagePullPolicy
 	if pullPolicy == "" {
 		pullPolicy = corev1.PullIfNotPresent
+	}
+
+	volumes := []corev1.Volume{
+		newConfigVolume(database, storage, cluster),
+	}
+
+	log.Info("volume Claim:", "template", storage.Spec)
+	log.Info("image", "name", storage.Spec.Image)
+
+	if storage.Spec.VolumeClaimTemplates == nil {
+		log.Info("here")
+		volumes = append(volumes, newDataVolume(database, storage, cluster))
 	}
 
 	set := &appsv1.StatefulSet{
@@ -289,7 +329,8 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 			},
-			PodManagementPolicy: appsv1.ParallelPodManagement,
+			PodManagementPolicy:  appsv1.ParallelPodManagement,
+			VolumeClaimTemplates: storage.Spec.VolumeClaimTemplates,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: newClusterLabels(database, cluster),
@@ -356,24 +397,7 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 							},
 						},
 					},
-					Volumes: []corev1.Volume{
-						{
-							Name: configVolume,
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: getClusterName(database, cluster),
-									},
-								},
-							},
-						},
-						{
-							Name: dataVolume,
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
-					},
+					Volumes: volumes,
 				},
 			},
 		},
