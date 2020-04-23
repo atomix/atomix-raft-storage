@@ -483,6 +483,9 @@ func (r *Reconciler) reconcilePartition(database *v1beta3.Database, storage *v1b
 			},
 		},
 	}
+	if err := controllerutil.SetControllerReference(&partition, service, r.scheme); err != nil {
+		return err
+	}
 	return r.client.Create(context.TODO(), service)
 }
 
