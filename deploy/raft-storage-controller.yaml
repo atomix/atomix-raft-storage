@@ -31,14 +31,98 @@ spec:
                   type: integer
                   min: 1
                   max: 9
+                  default: 1
                 partitionsPerCluster:
                   type: integer
                   min: 1
                   max: 1024
                   default: 1
+                volumeClaimTemplates:
+                  type: array
+                  "items": {
+                    "type": object,
+                    "required": [
+                      "metadata",
+                      "spec"
+                    ],
+                    "properties": {
+                      "metadata": {
+                        "$id": "#/items/properties/metadata",
+                        "type": "object",
+                        "default": {},
+                        "required": [
+                          "name"
+                        ],
+                        "properties": {
+                          "name": {
+                            "$id": "#/items/properties/metadata/properties/name",
+                            "type": "string",
+                            "default": "",
+
+                          }
+                        }
+                      },
+                      "spec": {
+                        "$id": "#/items/properties/spec",
+                        "type": "object",
+                        "default": {},
+                        "required": [
+                          "accessModes",
+                          "storageClassName",
+                          "resources"
+                        ],
+                        "properties": {
+                          "accessModes": {
+                            "$id": "#/items/properties/spec/properties/accessModes",
+                            "type": "array",
+                            "default": [],
+
+                            "items": {
+                              "$id": "#/items/properties/spec/properties/accessModes/items",
+                              "type": "string",
+                              "default": "",
+
+                            }
+                          },
+                          "storageClassName": {
+                            "$id": "#/items/properties/spec/properties/storageClassName",
+                            "type": "string",
+                            "default": "",
+
+                          },
+                          "resources": {
+                            "$id": "#/items/properties/spec/properties/resources",
+                            "type": "object",
+                            "default": {},
+                            "required": [
+                              "requests"
+                            ],
+                            "properties": {
+                              "requests": {
+                                "$id": "#/items/properties/spec/properties/resources/properties/requests",
+                                "type": "object",
+                                "default": {},
+                                "required": [
+                                  "storage"
+                                ],
+                                "properties": {
+                                  "storage": {
+                                    "$id": "#/items/properties/spec/properties/resources/properties/requests/properties/storage",
+                                    "type": "string",
+                                    "default": "",
+
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
 
 ---
-apiVersion: cloud.atomix.io/v1beta2
+apiVersion: cloud.atomix.io/v1beta3
 kind: StorageController
 metadata:
   name: raft
