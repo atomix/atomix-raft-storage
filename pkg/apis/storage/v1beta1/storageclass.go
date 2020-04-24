@@ -43,7 +43,7 @@ type RaftStorageClassSpec struct {
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
 	// VolumeClaim
-	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaim,omitempty"`
+	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 }
 
 // +genclient

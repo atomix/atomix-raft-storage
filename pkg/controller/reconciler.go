@@ -306,11 +306,8 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 		newConfigVolume(database, storage, cluster),
 	}
 
-	log.Info("volume Claim:", "template", storage.Spec)
-	log.Info("image", "name", storage.Spec.Image)
-
 	if storage.Spec.VolumeClaimTemplates == nil {
-		log.Info("here")
+
 		volumes = append(volumes, newDataVolume(database, storage, cluster))
 	}
 
