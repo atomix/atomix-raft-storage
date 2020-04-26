@@ -30,4 +30,4 @@ spec:
     version: v1beta1
     kind: RaftStorageClass
     name: raft-database
-    namespace: default
+    namespace: kube-system
