@@ -118,15 +118,6 @@ spec:
                   }
 
 ---
-apiVersion: cloud.atomix.io/v1beta3
-kind: StorageController
-metadata:
-  name: raft
-spec:
-  group: storage.cloud.atomix.io
-  version: v1beta1
-  kind: RaftStorageClass
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -177,7 +168,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: raft-storage-controller
-    namespace: kube-system
+    namespace: default
 roleRef:
   kind: ClusterRole
   name: raft-storage-controller
@@ -187,13 +178,13 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: raft-storage-controller
-  namespace: kube-system
+  namespace: default
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: raft-storage-controller
-  namespace: kube-system
+  namespace: default
 spec:
   replicas: 1
   selector:
