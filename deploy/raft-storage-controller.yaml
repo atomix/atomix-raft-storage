@@ -29,13 +29,9 @@ spec:
                   type: string
                 replicas:
                   type: integer
-                  min: 1
-                  max: 9
                   default: 1
                 partitionsPerCluster:
                   type: integer
-                  min: 1
-                  max: 1024
                   default: 1
                 volumeClaimTemplates:
                   type: array
