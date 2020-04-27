@@ -29,47 +29,35 @@ spec:
                   type: string
                 replicas:
                   type: integer
-                  min: 1
-                  max: 9
+                  minimum: 1
+                  maximum: 9
                   default: 1
                 partitionsPerCluster:
                   type: integer
-                  min: 1
-                  max: 1024
+                  minimum: 1
+                  maximum: 1024
                   default: 1
                 volumeClaimTemplates:
                   type: object
-                  default: {}
                   required:
                     - data
                   properties:
                     data:
                       type: object
-                      default: {}
                       required:
-                        - metadata
                         - spec
                       properties:
                         metadata:
                           type: object
-                          default: {}
-                          required:
-                            - name
                           properties:
                             name:
                               type: string
                               default: ''
                         spec:
                           type: object
-                          default: {}
-                          required:
-                            - accessModes
-                            - storageClassName
-                            - resources
                           properties:
                             accessModes:
                               type: array
-                              default: []
                               items:
                                 type: string
                                 default: ''
@@ -78,15 +66,9 @@ spec:
                               default: ''
                             resources:
                               type: object
-                              default: {}
-                              required:
-                                - requests
                               properties:
                                 requests:
                                   type: object
-                                  default: {}
-                                  required:
-                                    - storage
                                   properties:
                                     storage:
                                       type: string

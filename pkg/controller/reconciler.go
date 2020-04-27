@@ -315,7 +315,7 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 	}
 
 	volumeMounts = append(volumeMounts, configVolumeMount)
-	if storage.Spec.VolumeClaimTemplates.Data.Name == "" {
+	if storage.Spec.VolumeClaimTemplates.Data == nil {
 		dataVolumeMount := corev1.VolumeMount{
 			Name:      dataVolume,
 			MountPath: dataPath,
