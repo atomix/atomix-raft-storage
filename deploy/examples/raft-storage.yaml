@@ -1,26 +1,33 @@
 apiVersion: storage.cloud.atomix.io/v1beta1
 kind: RaftStorageClass
 metadata:
-    name: raft
-    labels:
-      app: raft
+  name: raft-database
+  labels:
+    app: raft-database
 spec:
-  image: atomix/raft-replica:latest
-  imagePullPolicy: IfNotPresent
+  image: atomix/raft-storage-node:v0.1.0
   replicas: 1
+  partitionsPerCluster: 3
+  volumeClaimTemplates:
+    data:
+      metadata:
+        name: "test"
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: "standard"
+        resources:
+          requests:
+            storage: "1Gi"
 ---
-apiVersion: cloud.atomix.io/v1beta2
+apiVersion: cloud.atomix.io/v1beta3
 kind: Database
 metadata:
-  name: raft
+  name: raft-database
 spec:
-  clusters: 3
-  template:
-    spec:
-      partitions: 10
-      storage:
-        group: storage.cloud.atomix.io
-        version: v1beta1
-        kind: RaftStorageClass
-        name: raft
-        namespace: kube-system
+  partitions: 1
+  storageClass:
+    group: storage.cloud.atomix.io
+    version: v1beta1
+    kind: RaftStorageClass
+    name: raft-database
+    namespace: kube-system

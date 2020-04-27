@@ -262,6 +262,34 @@ func (r *Reconciler) reconcileStatefulSet(database *v1beta3.Database, storage *v
 	return err
 }
 
+func newDataVolume(database *v1beta3.Database, storage *v1beta1.RaftStorageClass, cluster int) corev1.Volume {
+	dataVolume := corev1.Volume{
+		Name: dataVolume,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+
+	return dataVolume
+
+}
+
+func newConfigVolume(database *v1beta3.Database, storage *v1beta1.RaftStorageClass, cluster int) corev1.Volume {
+	configVolume := corev1.Volume{
+
+		Name: configVolume,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: getClusterName(database, cluster),
+				},
+			},
+		},
+	}
+	return configVolume
+
+}
+
 func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1.RaftStorageClass, cluster int) error {
 	log.Info("Creating raft replicas", "Name", database.Name, "Namespace", database.Namespace)
 
@@ -272,6 +300,41 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 	pullPolicy := storage.Spec.ImagePullPolicy
 	if pullPolicy == "" {
 		pullPolicy = corev1.PullIfNotPresent
+	}
+
+	volumes := []corev1.Volume{
+		newConfigVolume(database, storage, cluster),
+	}
+
+	var volumeClaimTemplates []corev1.PersistentVolumeClaim
+	var volumeMounts []corev1.VolumeMount
+
+	configVolumeMount := corev1.VolumeMount{
+		Name:      configVolume,
+		MountPath: configPath,
+	}
+
+	volumeMounts = append(volumeMounts, configVolumeMount)
+	if storage.Spec.VolumeClaimTemplates.Data == nil {
+		dataVolumeMount := corev1.VolumeMount{
+			Name:      dataVolume,
+			MountPath: dataPath,
+		}
+		volumes = append(volumes, newDataVolume(database, storage, cluster))
+		volumeMounts = append(volumeMounts, dataVolumeMount)
+	} else {
+		dataVolumeMount := corev1.VolumeMount{
+			Name:      storage.Spec.VolumeClaimTemplates.Data.Name,
+			MountPath: dataPath,
+		}
+		volumeMounts = append(volumeMounts, dataVolumeMount)
+		persistentVolumeClaim := corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: storage.Spec.VolumeClaimTemplates.Data.Name,
+			},
+			Spec: storage.Spec.VolumeClaimTemplates.Data.Spec,
+		}
+		volumeClaimTemplates = append(volumeClaimTemplates, persistentVolumeClaim)
 	}
 
 	set := &appsv1.StatefulSet{
@@ -289,7 +352,8 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 			},
-			PodManagementPolicy: appsv1.ParallelPodManagement,
+			PodManagementPolicy:  appsv1.ParallelPodManagement,
+			VolumeClaimTemplates: volumeClaimTemplates,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: newClusterLabels(database, cluster),
@@ -344,36 +408,10 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 								InitialDelaySeconds: 60,
 								TimeoutSeconds:      10,
 							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      dataVolume,
-									MountPath: dataPath,
-								},
-								{
-									Name:      configVolume,
-									MountPath: configPath,
-								},
-							},
+							VolumeMounts: volumeMounts,
 						},
 					},
-					Volumes: []corev1.Volume{
-						{
-							Name: configVolume,
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: getClusterName(database, cluster),
-									},
-								},
-							},
-						},
-						{
-							Name: dataVolume,
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
-					},
+					Volumes: volumes,
 				},
 			},
 		},
