@@ -42,8 +42,8 @@ type RaftStorageClassSpec struct {
 	// ImagePullPolicy is the pull policy to apply
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
-	// VolumeClaim
-	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
+	// VolumeClaimTemplates are volume claim templates to define persistent volumes
+	VolumeClaimTemplates VolumeClaimTemplates `json:"volumeClaimTemplates,omitempty"`
 }
 
 // +genclient

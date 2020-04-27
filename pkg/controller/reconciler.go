@@ -306,9 +306,35 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 		newConfigVolume(database, storage, cluster),
 	}
 
-	if storage.Spec.VolumeClaimTemplates == nil {
+	var volumeClaimTemplates []corev1.PersistentVolumeClaim
+	var volumeMounts []corev1.VolumeMount
 
+	configVolumeMount := corev1.VolumeMount{
+		Name:      configVolume,
+		MountPath: configPath,
+	}
+
+	volumeMounts = append(volumeMounts, configVolumeMount)
+	if storage.Spec.VolumeClaimTemplates.Data.Name == "" {
+		dataVolumeMount := corev1.VolumeMount{
+			Name:      dataVolume,
+			MountPath: dataPath,
+		}
 		volumes = append(volumes, newDataVolume(database, storage, cluster))
+		volumeMounts = append(volumeMounts, dataVolumeMount)
+	} else {
+		dataVolumeMount := corev1.VolumeMount{
+			Name:      storage.Spec.VolumeClaimTemplates.Data.Name,
+			MountPath: dataPath,
+		}
+		volumeMounts = append(volumeMounts, dataVolumeMount)
+		persistentVolumeClaim := corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: storage.Spec.VolumeClaimTemplates.Data.Name,
+			},
+			Spec: storage.Spec.VolumeClaimTemplates.Data.Spec,
+		}
+		volumeClaimTemplates = append(volumeClaimTemplates, persistentVolumeClaim)
 	}
 
 	set := &appsv1.StatefulSet{
@@ -327,7 +353,7 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 			},
 			PodManagementPolicy:  appsv1.ParallelPodManagement,
-			VolumeClaimTemplates: storage.Spec.VolumeClaimTemplates,
+			VolumeClaimTemplates: volumeClaimTemplates,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: newClusterLabels(database, cluster),
@@ -382,16 +408,7 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 								InitialDelaySeconds: 60,
 								TimeoutSeconds:      10,
 							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      dataVolume,
-									MountPath: dataPath,
-								},
-								{
-									Name:      configVolume,
-									MountPath: configPath,
-								},
-							},
+							VolumeMounts: volumeMounts,
 						},
 					},
 					Volumes: volumes,
