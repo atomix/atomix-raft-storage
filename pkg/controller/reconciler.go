@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"math"
 
-	api "github.com/atomix/api/proto/atomix/controller"
+	api "github.com/atomix/api/proto/atomix/database"
 	"github.com/atomix/kubernetes-controller/pkg/apis/cloud/v1beta3"
 	"github.com/atomix/kubernetes-controller/pkg/controller/util/k8s"
 	"github.com/atomix/raft-storage-controller/pkg/apis/storage/v1beta1"
@@ -203,9 +203,9 @@ func (r *Reconciler) addConfigMap(database *v1beta3.Database, storage *v1beta1.R
 
 // newNodeConfigString creates a node configuration string for the given cluster
 func newNodeConfigString(database *v1beta3.Database, storage *v1beta1.RaftStorageClass, cluster int) (string, error) {
-	members := make([]*api.MemberConfig, storage.Spec.Replicas)
+	replicas := make([]api.ReplicaConfig, storage.Spec.Replicas)
 	for i := 0; i < int(storage.Spec.Replicas); i++ {
-		members[i] = &api.MemberConfig{
+		replicas[i] = api.ReplicaConfig{
 			ID:           getPodName(database, cluster, i),
 			Host:         getPodDNSName(database, cluster, i),
 			ProtocolPort: protocolPort,
@@ -213,25 +213,18 @@ func newNodeConfigString(database *v1beta3.Database, storage *v1beta1.RaftStorag
 		}
 	}
 
-	partitions := make([]*api.PartitionId, 0, database.Spec.Partitions)
+	partitions := make([]api.PartitionId, 0, database.Spec.Partitions)
 	for partitionID := 1; partitionID <= int(database.Spec.Partitions); partitionID++ {
 		if getClusterForPartitionID(database, storage, partitionID) == cluster {
-			partition := &api.PartitionId{
+			partition := api.PartitionId{
 				Partition: int32(partitionID),
-				Cluster: &api.ClusterId{
-					ID: int32(cluster),
-					DatabaseID: &api.DatabaseId{
-						Name:      database.Name,
-						Namespace: database.Namespace,
-					},
-				},
 			}
 			partitions = append(partitions, partition)
 		}
 	}
 
-	config := &api.ClusterConfig{
-		Members:    members,
+	config := &api.DatabaseConfig{
+		Replicas:   replicas,
 		Partitions: partitions,
 	}
 
