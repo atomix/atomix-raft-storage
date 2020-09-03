@@ -31,21 +31,18 @@ spec:
                   type: integer
                   min: 1
                   max: 9
+                  default: 1
                 partitionsPerCluster:
                   type: integer
                   min: 1
                   max: 1024
                   default: 1
-
 ---
-apiVersion: cloud.atomix.io/v1beta2
-kind: StorageController
+apiVersion: v1
+kind: ServiceAccount
 metadata:
-  name: raft
-spec:
-  group: storage.cloud.atomix.io
-  version: v1beta1
-  kind: RaftStorageClass
+  name: raft-storage-controller
+  namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -103,12 +100,6 @@ roleRef:
   name: raft-storage-controller
   apiGroup: rbac.authorization.k8s.io
 ---
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: raft-storage-controller
-  namespace: kube-system
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -126,9 +117,8 @@ spec:
     spec:
       serviceAccountName: raft-storage-controller
       containers:
-        - name: raft-storage-controller
-          # Replace this with the built image name
-          image: atomix/raft-storage-controller:latest
+        - name: controller
+          image: atomix/raft-storage-controller:v0.3.0
           ports:
             - containerPort: 60000
               name: metrics
@@ -147,7 +137,7 @@ spec:
             failureThreshold: 1
           env:
             - name: CONTROLLER_NAME
-              value: "raft-storage-controller"
+              value: raft-storage-controller
             - name: CONTROLLER_NAMESPACE
               valueFrom:
                 fieldRef:
