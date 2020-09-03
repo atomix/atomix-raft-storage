@@ -29,13 +29,13 @@ spec:
                   type: string
                 replicas:
                   type: integer
-                  min: 1
-                  max: 9
+                  minimum: 1
+                  maximum: 9
                   default: 1
                 partitionsPerCluster:
                   type: integer
-                  min: 1
-                  max: 1024
+                  minimum: 1
+                  maximum: 1024
                   default: 1
 ---
 apiVersion: v1
