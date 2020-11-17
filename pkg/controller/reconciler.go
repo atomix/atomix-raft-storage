@@ -45,7 +45,7 @@ const (
 	apiPort               = 5678
 	protocolPort          = 5679
 	probePort             = 5679
-	defaultImage          = "atomix/raft-storage-node:v0.4.0"
+	defaultImage          = "atomix/raft-storage-node:v0.5.0"
 	headlessServiceSuffix = "hs"
 	clusterLabel          = "cluster"
 )
