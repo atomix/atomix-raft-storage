@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 
 	api "github.com/atomix/api/proto/atomix/database"
 	"github.com/atomix/kubernetes-controller/pkg/apis/cloud/v1beta3"
@@ -61,6 +62,8 @@ const (
 	configVolume = "config"
 	dataVolume   = "data"
 )
+
+const clusterDomainEnv = "CLUSTER_DOMAIN"
 
 var _ reconcile.Reconciler = &Reconciler{}
 
@@ -569,7 +572,11 @@ func getPodName(database *v1beta3.Database, cluster int, pod int) string {
 
 // getPodDNSName returns the fully qualified DNS name for the given pod ID
 func getPodDNSName(database *v1beta3.Database, cluster int, pod int) string {
-	return fmt.Sprintf("%s-%d.%s.%s.svc.cluster.local", getClusterName(database, cluster), pod, getClusterHeadlessServiceName(database, cluster), database.Namespace)
+	domain := os.Getenv(clusterDomainEnv)
+	if domain == "" {
+		domain = "cluster.local"
+	}
+	return fmt.Sprintf("%s-%d.%s.%s.svc.%s", getClusterName(database, cluster), pod, getClusterHeadlessServiceName(database, cluster), database.Namespace, domain)
 }
 
 // newClusterLabels returns the labels for the given cluster
