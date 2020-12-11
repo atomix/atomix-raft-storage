@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 
 	api "github.com/atomix/api/proto/atomix/database"
@@ -46,9 +45,12 @@ const (
 	apiPort               = 5678
 	protocolPort          = 5679
 	probePort             = 5679
-	defaultImage          = "atomix/raft-storage-node:v0.5.1"
+	defaultImage          = "atomix/raft-storage-node:v0.5.2"
 	headlessServiceSuffix = "hs"
+	appLabel              = "app"
+	databaseLabel         = "database"
 	clusterLabel          = "cluster"
+	appAtomix             = "atomix"
 )
 
 const (
@@ -130,7 +132,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 }
 
 func (r *Reconciler) reconcileClusters(database *v1beta3.Database, storage *v1beta1.RaftStorageClass) error {
-	clusters := getClusters(database, storage)
+	clusters := getClusters(storage)
 	for cluster := 1; cluster <= clusters; cluster++ {
 		err := r.reconcileCluster(database, storage, cluster)
 		if err != nil {
@@ -218,7 +220,7 @@ func newNodeConfigString(database *v1beta3.Database, storage *v1beta1.RaftStorag
 
 	partitions := make([]api.PartitionId, 0, database.Spec.Partitions)
 	for partitionID := 1; partitionID <= int(database.Spec.Partitions); partitionID++ {
-		if getClusterForPartitionID(database, storage, partitionID) == cluster {
+		if getClusterForPartitionID(storage, partitionID) == cluster {
 			partition := api.PartitionId{
 				Partition: int32(partitionID),
 			}
@@ -268,6 +270,39 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 	pullPolicy := storage.Spec.ImagePullPolicy
 	if pullPolicy == "" {
 		pullPolicy = corev1.PullIfNotPresent
+	}
+
+	volumes := []corev1.Volume{
+		{
+			Name: configVolume,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: getClusterName(database, cluster),
+					},
+				},
+			},
+		},
+	}
+
+	volumeClaimTemplates := []corev1.PersistentVolumeClaim{}
+
+	dataVolumeName := dataVolume
+	if storage.Spec.VolumeClaimTemplate != nil {
+		pvc := storage.Spec.VolumeClaimTemplate
+		if pvc.Name == "" {
+			pvc.Name = dataVolume
+		} else {
+			dataVolumeName = pvc.Name
+		}
+		volumeClaimTemplates = append(volumeClaimTemplates, *pvc)
+	} else {
+		volumes = append(volumes, corev1.Volume{
+			Name: dataVolume,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
 	}
 
 	set := &appsv1.StatefulSet{
@@ -342,7 +377,7 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
-									Name:      dataVolume,
+									Name:      dataVolumeName,
 									MountPath: dataPath,
 								},
 								{
@@ -352,26 +387,26 @@ func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1
 							},
 						},
 					},
-					Volumes: []corev1.Volume{
-						{
-							Name: configVolume,
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: getClusterName(database, cluster),
+					Affinity: &corev1.Affinity{
+						PodAntiAffinity: &corev1.PodAntiAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+								{
+									Weight: 1,
+									PodAffinityTerm: corev1.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: newClusterLabels(database, cluster),
+										},
+										Namespaces:  []string{database.Namespace},
+										TopologyKey: "kubernetes.io/hostname",
 									},
 								},
 							},
 						},
-						{
-							Name: dataVolume,
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
 					},
+					Volumes: volumes,
 				},
 			},
+			VolumeClaimTemplates: volumeClaimTemplates,
 		},
 	}
 
@@ -420,7 +455,7 @@ func (r *Reconciler) addService(database *v1beta3.Database, storage *v1beta1.Raf
 			},
 			PublishNotReadyAddresses: true,
 			ClusterIP:                "None",
-			Selector:                 database.Labels,
+			Selector:                 newClusterLabels(database, cluster),
 		},
 	}
 
@@ -461,12 +496,12 @@ func (r *Reconciler) reconcilePartition(database *v1beta3.Database, storage *v1b
 		return err
 	}
 
-	cluster := getClusterForPartition(database, storage, &partition)
+	cluster := getClusterForPartition(storage, &partition)
 	service = &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   partition.Namespace,
 			Name:        partition.Spec.ServiceName,
-			Labels:      partition.Labels,
+			Labels:      newClusterLabels(database, cluster),
 			Annotations: partition.Annotations,
 		},
 		Spec: corev1.ServiceSpec{
@@ -499,7 +534,7 @@ func (r *Reconciler) reconcileStatus(database *v1beta3.Database, storage *v1beta
 	for _, partition := range partitions.Items {
 		if !partition.Status.Ready {
 			log.Info("Reconcile status", "Database", database.Name, "Partition", partition.Name, "Ready", partition.Status.Ready)
-			cluster := getClusterForPartition(database, storage, &partition)
+			cluster := getClusterForPartition(storage, &partition)
 
 			statefulSet := &appsv1.StatefulSet{}
 			name := types.NamespacedName{
@@ -528,26 +563,21 @@ func (r *Reconciler) reconcileStatus(database *v1beta3.Database, storage *v1beta
 }
 
 // getClusters returns the number of clusters in the given database
-func getClusters(database *v1beta3.Database, storage *v1beta1.RaftStorageClass) int {
-	partitions := database.Spec.Partitions
-	if partitions == 0 {
-		partitions = 1
+func getClusters(storage *v1beta1.RaftStorageClass) int {
+	if storage.Spec.Clusters == 0 {
+		return 1
 	}
-	partitionsPerCluster := storage.Spec.PartitionsPerCluster
-	if partitionsPerCluster == 0 {
-		partitionsPerCluster = 1
-	}
-	return int(math.Ceil(float64(partitions) / float64(partitionsPerCluster)))
+	return int(storage.Spec.Clusters)
 }
 
 // getClusterForPartition returns the cluster ID for the given partition ID
-func getClusterForPartition(database *v1beta3.Database, storage *v1beta1.RaftStorageClass, partition *v1beta3.Partition) int {
-	return getClusterForPartitionID(database, storage, int(partition.Spec.PartitionID))
+func getClusterForPartition(storage *v1beta1.RaftStorageClass, partition *v1beta3.Partition) int {
+	return getClusterForPartitionID(storage, int(partition.Spec.PartitionID))
 }
 
 // getClusterForPartitionID returns the cluster ID for the given partition ID
-func getClusterForPartitionID(database *v1beta3.Database, storage *v1beta1.RaftStorageClass, partition int) int {
-	return (partition % getClusters(database, storage)) + 1
+func getClusterForPartitionID(storage *v1beta1.RaftStorageClass, partition int) int {
+	return (partition % getClusters(storage)) + 1
 }
 
 // getClusterResourceName returns the given resource name for the given cluster
@@ -585,6 +615,8 @@ func newClusterLabels(database *v1beta3.Database, cluster int) map[string]string
 	for key, value := range database.Labels {
 		labels[key] = value
 	}
+	labels[appLabel] = appAtomix
+	labels[databaseLabel] = fmt.Sprintf("%s.%s", database.Name, database.Namespace)
 	labels[clusterLabel] = fmt.Sprint(cluster)
 	return labels
 }

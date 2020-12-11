@@ -30,7 +30,11 @@ const RaftStorageClassKind = "RaftStorageClass"
 
 // RaftStorageClassSpec defines the desired state of RaftStorageClass
 type RaftStorageClassSpec struct {
-	// PartitionsPerCluster is the number of partitions to store in each RaftCluster
+	// Clusters is the number of clusters to create
+	Clusters int32 `json:"clusters,omitempty"`
+
+	// PartitionsPerCluster is the number of partitions per cluster
+	// Deprecated: Use Clusters instead
 	PartitionsPerCluster int32 `json:"partitionsPerCluster,omitempty"`
 
 	// Replicas is the number of raft replicas
@@ -41,6 +45,9 @@ type RaftStorageClassSpec struct {
 
 	// ImagePullPolicy is the pull policy to apply
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// VolumeClaimTemplate is the volume claim template for Raft logs
+	VolumeClaimTemplate *corev1.PersistentVolumeClaim `json:"volumeClaimTemplate,omitempty"`
 }
 
 // +genclient

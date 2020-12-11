@@ -32,11 +32,19 @@ spec:
                   minimum: 1
                   maximum: 9
                   default: 1
+                clusters:
+                  type: integer
+                  minimum: 1
+                  maximum: 1024
+                  default: 1
                 partitionsPerCluster:
                   type: integer
                   minimum: 1
                   maximum: 1024
                   default: 1
+                volumeClaimTemplate:
+                  x-kubernetes-preserve-unknown-fields: true
+                  type: object
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -118,7 +126,7 @@ spec:
       serviceAccountName: raft-storage-controller
       containers:
         - name: controller
-          image: atomix/raft-storage-controller:v0.5.2
+          image: atomix/raft-storage-controller:latest
           ports:
             - containerPort: 60000
               name: metrics
