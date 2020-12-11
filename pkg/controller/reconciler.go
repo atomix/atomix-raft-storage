@@ -45,7 +45,8 @@ const (
 	apiPort               = 5678
 	protocolPort          = 5679
 	probePort             = 5679
-	defaultImage          = "atomix/raft-storage-node:v0.5.2"
+	defaultImageEnv       = "DEFAULT_NODE_IMAGE"
+	defaultImage          = "atomix/raft-storage-node:v0.5.3"
 	headlessServiceSuffix = "hs"
 	appLabel              = "app"
 	databaseLabel         = "database"
@@ -263,10 +264,7 @@ func (r *Reconciler) reconcileStatefulSet(database *v1beta3.Database, storage *v
 func (r *Reconciler) addStatefulSet(database *v1beta3.Database, storage *v1beta1.RaftStorageClass, cluster int) error {
 	log.Info("Creating raft replicas", "Name", database.Name, "Namespace", database.Namespace)
 
-	image := storage.Spec.Image
-	if image == "" {
-		image = defaultImage
-	}
+	image := getImage(storage)
 	pullPolicy := storage.Spec.ImagePullPolicy
 	if pullPolicy == "" {
 		pullPolicy = corev1.PullIfNotPresent
@@ -619,4 +617,19 @@ func newClusterLabels(database *v1beta3.Database, cluster int) map[string]string
 	labels[databaseLabel] = fmt.Sprintf("%s.%s", database.Name, database.Namespace)
 	labels[clusterLabel] = fmt.Sprint(cluster)
 	return labels
+}
+
+func getImage(storage *v1beta1.RaftStorageClass) string {
+	if storage.Spec.Image != "" {
+		return storage.Spec.Image
+	}
+	return getDefaultImage()
+}
+
+func getDefaultImage() string {
+	image := os.Getenv(defaultImageEnv)
+	if image == "" {
+		image = defaultImage
+	}
+	return image
 }
