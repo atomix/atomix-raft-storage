@@ -126,7 +126,7 @@ spec:
       serviceAccountName: raft-storage-controller
       containers:
         - name: controller
-          image: atomix/raft-storage-controller:latest
+          image: atomix/raft-storage-controller:v0.5.3
           ports:
             - containerPort: 60000
               name: metrics
