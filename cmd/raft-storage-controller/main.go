@@ -20,7 +20,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/atomix/raft-storage-controller/pkg/controller"
+	controller "github.com/atomix/raft-storage-controller/pkg/controller/storage/v1beta1"
 
 	"os"
 	"runtime"
