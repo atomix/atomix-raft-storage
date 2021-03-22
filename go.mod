@@ -22,4 +22,6 @@ replace github.com/atomix/api/go => ../atomix-api/go
 
 replace github.com/atomix/go-framework => ../atomix-go-node
 
+replace github.com/atomix/kubernetes-controller => ../atomix-k8s-controller
+
 replace github.com/atomix/kubernetes-framework => ../atomix-kubernetes-framework
