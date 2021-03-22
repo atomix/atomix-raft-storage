@@ -7,7 +7,6 @@ require (
 	github.com/atomix/api v0.2.0
 	github.com/atomix/api/go v0.3.3
 	github.com/atomix/kubernetes-controller v0.4.0
-	github.com/atomix/kubernetes-framework v0.4.0
 	github.com/gogo/protobuf v1.3.1
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	go.uber.org/atomic v1.4.0 // indirect
@@ -23,5 +22,3 @@ replace github.com/atomix/api/go => ../atomix-api/go
 replace github.com/atomix/go-framework => ../atomix-go-node
 
 replace github.com/atomix/kubernetes-controller => ../atomix-k8s-controller
-
-replace github.com/atomix/kubernetes-framework => ../atomix-kubernetes-framework

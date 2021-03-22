@@ -17,10 +17,12 @@ package main
 import (
 	"context"
 	"fmt"
+	storagev2beta1 "github.com/atomix/raft-storage-controller/pkg/controller/storage/v2beta1"
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	controller "github.com/atomix/raft-storage-controller/pkg/controller/storage/v1beta1"
+	primitivesv2beta1 "github.com/atomix/raft-storage-controller/pkg/controller/primitives/v2beta1"
+	storagev1beta1 "github.com/atomix/raft-storage-controller/pkg/controller/storage/v1beta1"
 
 	"os"
 	"runtime"
@@ -86,8 +88,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Setup the TestStorage controller
-	if err := controller.Add(mgr); err != nil {
+	// Add the storage/v1beta1 controllers
+	if err := storagev1beta1.AddControllers(mgr); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
+	// Add the storage/v2beta1 controllers
+	if err := storagev2beta1.AddControllers(mgr); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
+	// Add the storage/v2beta1 controllers
+	if err := primitivesv2beta1.AddControllers(mgr); err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}

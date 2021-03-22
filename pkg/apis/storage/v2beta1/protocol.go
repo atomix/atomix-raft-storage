@@ -15,13 +15,29 @@
 package v2beta1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // RaftProtocolSpec specifies a RaftProtocol configuration
 type RaftProtocolSpec struct {
-	Clusters   int32 `json:"clusters,omitempty"`
+	// Clusters is the number of clusters to create
+	Clusters int32 `json:"clusters,omitempty"`
+
+	// Partitions is the number of partitions
 	Partitions int32 `json:"partitions,omitempty"`
+
+	// Replicas is the number of raft replicas
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// Image is the image to run
+	Image string `json:"image,omitempty"`
+
+	// ImagePullPolicy is the pull policy to apply
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// VolumeClaimTemplate is the volume claim template for Raft logs
+	VolumeClaimTemplate *corev1.PersistentVolumeClaim `json:"volumeClaimTemplate,omitempty"`
 }
 
 // +genclient

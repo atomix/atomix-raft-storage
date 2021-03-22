@@ -27,9 +27,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// Add creates a new Partition ManagementGroup and adds it to the Manager. The Manager will set fields on the ManagementGroup
+// AddControllers creates a new Partition ManagementGroup and adds it to the Manager. The Manager will set fields on the ManagementGroup
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
+func AddControllers(mgr manager.Manager) error {
 	log.Info("Add manager")
 	r := &Reconciler{
 		client: mgr.GetClient(),
