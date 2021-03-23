@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"fmt"
+	primitives "github.com/atomix/kubernetes-controller/pkg/apis/primitives/v2beta1"
 	storagev2beta1 "github.com/atomix/raft-storage-controller/pkg/controller/storage/v2beta1"
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -84,6 +85,12 @@ func main() {
 
 	// Setup Scheme for all resources
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
+	// Setup Scheme for all resources
+	if err := primitives.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}

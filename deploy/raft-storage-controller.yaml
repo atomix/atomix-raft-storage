@@ -11,40 +11,40 @@ spec:
     singular: raftstorageclass
   scope: Namespaced
   versions:
-    - name: v1beta1
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          required:
-            - spec
-          properties:
-            spec:
-              type: object
-              properties:
-                image:
-                  type: string
-                imagePullPolicy:
-                  type: string
-                replicas:
-                  type: integer
-                  minimum: 1
-                  maximum: 9
-                  default: 1
-                clusters:
-                  type: integer
-                  minimum: 1
-                  maximum: 1024
-                  default: 1
-                partitionsPerCluster:
-                  type: integer
-                  minimum: 1
-                  maximum: 1024
-                  default: 1
-                volumeClaimTemplate:
-                  x-kubernetes-preserve-unknown-fields: true
-                  type: object
+  - name: v1beta1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        required:
+        - spec
+        properties:
+          spec:
+            type: object
+            properties:
+              image:
+                type: string
+              imagePullPolicy:
+                type: string
+              replicas:
+                type: integer
+                minimum: 1
+                maximum: 9
+                default: 1
+              clusters:
+                type: integer
+                minimum: 1
+                maximum: 1024
+                default: 1
+              partitionsPerCluster:
+                type: integer
+                minimum: 1
+                maximum: 1024
+                default: 1
+              volumeClaimTemplate:
+                x-kubernetes-preserve-unknown-fields: true
+                type: object
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -106,51 +106,63 @@ metadata:
   creationTimestamp: null
   name: raft-storage-controller
 rules:
-  - apiGroups:
-      - ""
-    resources:
-      - pods
-      - services
-      - endpoints
-      - events
-      - configmaps
-      - secrets
-    verbs:
-      - '*'
-  - apiGroups:
-      - ""
-    resources:
-      - namespaces
-    verbs:
-      - get
-  - apiGroups:
-      - apps
-    resources:
-      - statefulsets
-    verbs:
-      - '*'
-  - apiGroups:
-      - policy
-    resources:
-      - poddisruptionbudgets
-    verbs:
-      - '*'
-  - apiGroups:
-      - cloud.atomix.io
-      - storage.cloud.atomix.io
-    resources:
-      - '*'
-    verbs:
-      - '*'
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - services
+  - endpoints
+  - events
+  - configmaps
+  - secrets
+  - serviceaccounts
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - '*'
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - '*'
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  - clusterroles
+  - clusterrolebindings
+  verbs:
+  - '*'
+- apiGroups:
+  - cloud.atomix.io
+  - storage.cloud.atomix.io
+  - primitives.k8s.atomix.io
+  - storage.k8s.atomix.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: raft-storage-controller
 subjects:
-  - kind: ServiceAccount
-    name: raft-storage-controller
-    namespace: kube-system
+- kind: ServiceAccount
+  name: raft-storage-controller
+  namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: raft-storage-controller
@@ -173,38 +185,38 @@ spec:
     spec:
       serviceAccountName: raft-storage-controller
       containers:
-        - name: controller
-          image: atomix/raft-storage-controller:latest
-          ports:
-            - containerPort: 60000
-              name: metrics
-            - containerPort: 5679
-              name: control
-          command:
-            - raft-storage-controller
-          imagePullPolicy: IfNotPresent
-          readinessProbe:
-            exec:
-              command:
-                - stat
-                - /tmp/atomix-controller-ready
-            initialDelaySeconds: 4
-            periodSeconds: 10
-            failureThreshold: 1
-          env:
-            - name: CONTROLLER_NAME
-              value: raft-storage-controller
-            - name: CONTROLLER_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            - name: DEFAULT_NODE_IMAGE
-              value: atomix/raft-storage-node:latest
+      - name: controller
+        image: atomix/raft-storage-controller:latest
+        ports:
+        - containerPort: 60000
+          name: metrics
+        - containerPort: 5679
+          name: control
+        command:
+        - raft-storage-controller
+        imagePullPolicy: IfNotPresent
+        readinessProbe:
+          exec:
+            command:
+            - stat
+            - /tmp/atomix-controller-ready
+          initialDelaySeconds: 4
+          periodSeconds: 10
+          failureThreshold: 1
+        env:
+        - name: CONTROLLER_NAME
+          value: raft-storage-controller
+        - name: CONTROLLER_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: DEFAULT_NODE_IMAGE
+          value: atomix/raft-storage-node:latest
