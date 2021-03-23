@@ -45,7 +45,10 @@ func AddControllers(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to secondary resource StatefulSet
-	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{})
+	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
+		OwnerType:    &v2beta1.RaftProtocol{},
+		IsController: false,
+	 })
 	if err != nil {
 		return err
 	}

@@ -46,6 +46,54 @@ spec:
                   x-kubernetes-preserve-unknown-fields: true
                   type: object
 ---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: raftprotocols.storage.k8s.atomix.io
+spec:
+  group: storage.k8s.atomix.io
+  names:
+    kind: RaftProtocol
+    listKind: RaftProtocolList
+    plural: raftprotocols
+    singular: raftprotocol
+  scope: Namespaced
+  versions:
+  - name: v2beta1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        required:
+        - spec
+        properties:
+          spec:
+            type: object
+            properties:
+              image:
+                type: string
+              imagePullPolicy:
+                type: string
+              clusters:
+                type: integer
+                minimum: 1
+                maximum: 1024
+                default: 1
+              partitions:
+                type: integer
+                minimum: 1
+                maximum: 1024
+                default: 1
+              replicas:
+                type: integer
+                minimum: 1
+                maximum: 9
+                default: 1
+              volumeClaimTemplate:
+                x-kubernetes-preserve-unknown-fields: true
+                type: object
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -126,7 +174,7 @@ spec:
       serviceAccountName: raft-storage-controller
       containers:
         - name: controller
-          image: atomix/raft-storage-controller:v0.5.4
+          image: atomix/raft-storage-controller:latest
           ports:
             - containerPort: 60000
               name: metrics
@@ -159,4 +207,4 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             - name: DEFAULT_NODE_IMAGE
-              value: atomix/raft-storage-node:v0.5.3
+              value: atomix/raft-storage-node:latest
