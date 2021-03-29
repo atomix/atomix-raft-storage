@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	primitives "github.com/atomix/kubernetes-controller/pkg/apis/primitives/v2beta1"
 	storagev2beta1 "github.com/atomix/raft-storage-controller/pkg/controller/storage/v2beta1"
 
@@ -46,6 +47,8 @@ func printVersion() {
 }
 
 func main() {
+	logging.SetLevel(logging.DebugLevel)
+
 	logf.SetLogger(zap.New())
 	var namespace string
 	if len(os.Args) > 1 {

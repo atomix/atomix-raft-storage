@@ -14,5 +14,5 @@
 
 // Package v2beta1 contains API Schema definitions for the cloud v2beta1 API group
 // +k8s:deepcopy-gen=package,register
-// +groupName=storage.k8s.atomix.io
+// +groupName=storage.atomix.io
 package v2beta1

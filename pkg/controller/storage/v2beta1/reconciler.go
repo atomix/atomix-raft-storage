@@ -18,9 +18,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"os"
 
-	api "github.com/atomix/api/proto/atomix/database"
 	storagev2beta1 "github.com/atomix/raft-storage-controller/pkg/apis/storage/v2beta1"
 	"github.com/gogo/protobuf/jsonpb"
 	appsv1 "k8s.io/api/apps/v1"
@@ -40,10 +40,11 @@ var log = logf.Log.WithName("raft_storage_controller")
 
 const (
 	apiPort               = 5678
+	protocolPortName      = "raft"
 	protocolPort          = 5679
 	probePort             = 5679
 	defaultImageEnv       = "DEFAULT_NODE_IMAGE"
-	defaultImage          = "atomix/raft-storage-node:v0.5.3"
+	defaultImage          = "atomix/dragonboat-raft-storage-node:latest"
 	headlessServiceSuffix = "hs"
 	appLabel              = "app"
 	databaseLabel         = "database"
@@ -180,27 +181,32 @@ func (r *Reconciler) addConfigMap(storage *storagev2beta1.RaftProtocol, cluster 
 
 // newNodeConfigString creates a node configuration string for the given cluster
 func newNodeConfigString(storage *storagev2beta1.RaftProtocol, cluster int) (string, error) {
-	replicas := make([]api.ReplicaConfig, storage.Spec.Replicas)
+	replicas := make([]protocolapi.ProtocolReplica, storage.Spec.Replicas)
+	replicaNames := make([]string, storage.Spec.Replicas)
 	for i := 0; i < int(storage.Spec.Replicas); i++ {
-		replicas[i] = api.ReplicaConfig{
-			ID:           getPodName(storage, cluster, i),
-			Host:         getPodDNSName(storage, cluster, i),
-			ProtocolPort: protocolPort,
-			APIPort:      apiPort,
+		replicas[i] = protocolapi.ProtocolReplica{
+			ID:      getPodName(storage, cluster, i),
+			Host:    getPodDNSName(storage, cluster, i),
+			APIPort: apiPort,
+			ExtraPorts: map[string]int32{
+				protocolPortName: protocolPort,
+			},
 		}
+		replicaNames[i] = getPodName(storage, cluster, i)
 	}
 
-	partitions := make([]api.PartitionId, 0, storage.Spec.Partitions)
+	partitions := make([]protocolapi.ProtocolPartition, 0, storage.Spec.Partitions)
 	for partitionID := 1; partitionID <= int(storage.Spec.Partitions); partitionID++ {
 		if getClusterForPartitionID(storage, partitionID) == cluster {
-			partition := api.PartitionId{
-				Partition: int32(partitionID),
+			partition := protocolapi.ProtocolPartition{
+				PartitionID: uint32(partitionID),
+				Replicas:    replicaNames,
 			}
 			partitions = append(partitions, partition)
 		}
 	}
 
-	config := &api.DatabaseConfig{
+	config := &protocolapi.ProtocolConfig{
 		Replicas:   replicas,
 		Partitions: partitions,
 	}

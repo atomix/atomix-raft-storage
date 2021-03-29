@@ -16,7 +16,7 @@
 
 // Package v2beta1 contains API Schema definitions for the cloud v2beta1 API group
 // +k8s:deepcopy-gen=package,register
-// +groupName=storage.k8s.atomix.io
+// +groupName=storage.atomix.io
 package v2beta1
 
 import (
@@ -26,7 +26,7 @@ import (
 
 var (
 	// SchemeGroupVersion is group version used to register these objects
-	SchemeGroupVersion = schema.GroupVersion{Group: "storage.k8s.atomix.io", Version: "v2beta1"}
+	SchemeGroupVersion = schema.GroupVersion{Group: "storage.atomix.io", Version: "v2beta1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: SchemeGroupVersion}

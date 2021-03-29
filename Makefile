@@ -40,9 +40,13 @@ proto:
 		--entrypoint build/bin/compile_protos.sh \
 		onosproject/protoc-go:stable
 
-image: # @HELP build atomix storage controller Docker images
-image: build
+images: # @HELP build atomix storage controller Docker images
+images: build
 	docker build . -f build/docker/Dockerfile -t atomix/raft-storage-controller:${ATOMIX_RAFT_STORAGE_VERSION}
+
+kind: images
+	@if [ "`kind get clusters`" = '' ]; then echo "no kind cluster found" && exit 1; fi
+	kind load docker-image atomix/raft-storage-controller:${ATOMIX_RAFT_STORAGE_VERSION}
 
 push: # @HELP push atomix-raft-node Docker image
 	docker push atomix/raft-storage-controller:${ATOMIX_RAFT_STORAGE_VERSION}

@@ -4,6 +4,8 @@ go 1.12
 
 require (
 	github.com/atomix/api v0.3.3
+	github.com/atomix/api/go v0.3.3
+	github.com/atomix/go-framework v0.5.1
 	github.com/atomix/kubernetes-controller v0.4.0
 	github.com/gogo/protobuf v1.3.1
 	github.com/hashicorp/golang-lru v0.5.3 // indirect

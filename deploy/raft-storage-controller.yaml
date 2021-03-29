@@ -49,9 +49,9 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: raftprotocols.storage.k8s.atomix.io
+  name: raftprotocols.storage.atomix.io
 spec:
-  group: storage.k8s.atomix.io
+  group: storage.atomix.io
   names:
     kind: RaftProtocol
     listKind: RaftProtocolList
@@ -110,6 +110,8 @@ rules:
   - ""
   resources:
   - pods
+  - pods/status
+  - pods/ephemeralcontainers
   - services
   - endpoints
   - events
@@ -137,6 +139,12 @@ rules:
   verbs:
   - '*'
 - apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  verbs:
+  - '*'
+- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - roles
@@ -148,8 +156,8 @@ rules:
 - apiGroups:
   - cloud.atomix.io
   - storage.cloud.atomix.io
-  - primitives.k8s.atomix.io
-  - storage.k8s.atomix.io
+  - atomix.io
+  - storage.atomix.io
   resources:
   - '*'
   verbs:
@@ -168,6 +176,21 @@ roleRef:
   name: raft-storage-controller
   apiGroup: rbac.authorization.k8s.io
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: raft-storage-controller
+  namespace: kube-system
+  labels:
+    name: raft-storage-controller
+spec:
+  selector:
+    name: raft-storage-controller
+  ports:
+  - name: webhook
+    port: 443
+    targetPort: 443
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -184,17 +207,47 @@ spec:
         name: raft-storage-controller
     spec:
       serviceAccountName: raft-storage-controller
+      initContainers:
+      - name: init-certs
+        image: atomix/kubernetes-controller-init:latest
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsUser: 0
+        env:
+        - name: CONTROLLER_NAME
+          value: raft-storage-controller
+        - name: CONTROLLER_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: WEBHOOK_NAME
+          value: driver-injector.raftprotocols.storage.k8s.atomix.io
+        - name: WEBHOOK_PATH
+          value: /inject-driver
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: certs
+          mountPath: /etc/webhook/certs
       containers:
       - name: controller
         image: atomix/raft-storage-controller:latest
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsUser: 0
         ports:
-        - containerPort: 60000
-          name: metrics
         - containerPort: 5679
           name: control
         command:
         - raft-storage-controller
-        imagePullPolicy: IfNotPresent
         readinessProbe:
           exec:
             command:
@@ -210,6 +263,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: WEBHOOK_NAME
+          value: driver-injector.raftprotocols.storage.k8s.atomix.io
+        - name: WEBHOOK_PATH
+          value: /inject-driver
         - name: POD_NAME
           valueFrom:
             fieldRef:
@@ -218,5 +275,32 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        - name: DEFAULT_NODE_IMAGE
-          value: atomix/raft-storage-node:latest
+        volumeMounts:
+        - name: certs
+          mountPath: /tmp/k8s-webhook-server/serving-certs
+          readOnly: true
+      volumes:
+      - name: certs
+        emptyDir: {}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: raft-storage-controller
+webhooks:
+- name: driver-injector.raftprotocols.storage.k8s.atomix.io
+  rules:
+  - operations: ["CREATE"]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
+    scope: Namespaced
+  clientConfig:
+    service:
+      name: raft-storage-controller
+      namespace: kube-system
+      path: /inject-driver
+  admissionReviewVersions: ["v1beta1"]
+  sideEffects: None
+  failurePolicy: Ignore
+  timeoutSeconds: 10
