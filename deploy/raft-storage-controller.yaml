@@ -264,7 +264,7 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: WEBHOOK_NAME
-          value: driver-injector.raftprotocols.storage.k8s.atomix.io
+          value: driver-injector.raftprotocols.storage.atomix.io
         - name: WEBHOOK_PATH
           value: /inject-driver
         - name: POD_NAME
@@ -288,7 +288,7 @@ kind: MutatingWebhookConfiguration
 metadata:
   name: raft-storage-controller
 webhooks:
-- name: driver-injector.raftprotocols.storage.k8s.atomix.io
+- name: driver.raft.storage.atomix.io
   rules:
   - operations: ["CREATE"]
     apiGroups: [""]
@@ -299,7 +299,23 @@ webhooks:
     service:
       name: raft-storage-controller
       namespace: kube-system
-      path: /inject-driver
+      path: /create-pod
+  admissionReviewVersions: ["v1beta1"]
+  sideEffects: None
+  failurePolicy: Ignore
+  timeoutSeconds: 10
+- name: primitives.raft.storage.atomix.io
+  rules:
+  - operations: ["CREATE"]
+    apiGroups: ["primitives.atomix.io"]
+    apiVersions: ["v2beta1"]
+    resources: ["*"]
+    scope: Namespaced
+  clientConfig:
+    service:
+      name: raft-storage-controller
+      namespace: kube-system
+      path: /create-primitive
   admissionReviewVersions: ["v1beta1"]
   sideEffects: None
   failurePolicy: Ignore

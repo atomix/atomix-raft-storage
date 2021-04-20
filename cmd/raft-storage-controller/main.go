@@ -18,12 +18,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	core "github.com/atomix/kubernetes-controller/pkg/apis/core/v2beta1"
 	primitives "github.com/atomix/kubernetes-controller/pkg/apis/primitives/v2beta1"
 	storagev2beta1 "github.com/atomix/raft-storage-controller/pkg/controller/storage/v2beta1"
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	primitivesv2beta1 "github.com/atomix/raft-storage-controller/pkg/controller/primitives/v2beta1"
 	storagev1beta1 "github.com/atomix/raft-storage-controller/pkg/controller/storage/v1beta1"
 
 	"os"
@@ -92,8 +92,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Setup Scheme for all resources
+	// Setup Scheme for primitive resources
 	if err := primitives.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
+	// Setup Scheme for storage resources
+	if err := core.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}
@@ -106,12 +112,6 @@ func main() {
 
 	// Add the storage/v2beta1 controllers
 	if err := storagev2beta1.AddControllers(mgr); err != nil {
-		log.Error(err, "")
-		os.Exit(1)
-	}
-
-	// Add the storage/v2beta1 controllers
-	if err := primitivesv2beta1.AddControllers(mgr); err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}

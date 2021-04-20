@@ -19,7 +19,12 @@ import (
 	"encoding/json"
 	"fmt"
 	protocolapi "github.com/atomix/api/go/atomix/protocol"
+	"github.com/atomix/kubernetes-controller/pkg/apis/core/v2beta1"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	storagev2beta1 "github.com/atomix/raft-storage-controller/pkg/apis/storage/v2beta1"
 	"github.com/gogo/protobuf/jsonpb"
@@ -32,11 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
-
-var log = logf.Log.WithName("raft_storage_controller")
 
 const (
 	apiPort               = 5678
@@ -66,6 +68,44 @@ const (
 
 const clusterDomainEnv = "CLUSTER_DOMAIN"
 
+func addRaftProtocolController(mgr manager.Manager) error {
+	r := &Reconciler{
+		client: mgr.GetClient(),
+		scheme: mgr.GetScheme(),
+	}
+
+	// Create a new controller
+	c, err := controller.New(mgr.GetScheme().Name(), mgr, controller.Options{Reconciler: r})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to the storage resource and enqueue Clusters that reference it
+	err = c.Watch(&source.Kind{Type: &storagev2beta1.RaftProtocol{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to secondary resource Protocol
+	err = c.Watch(&source.Kind{Type: &v2beta1.Protocol{}}, &handler.EnqueueRequestForOwner{
+		OwnerType:    &storagev2beta1.RaftProtocol{},
+		IsController: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to secondary resource StatefulSet
+	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
+		OwnerType:    &storagev2beta1.RaftProtocol{},
+		IsController: false,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 var _ reconcile.Reconciler = &Reconciler{}
 
 // Reconciler reconciles a Cluster object
@@ -78,8 +118,8 @@ type Reconciler struct {
 // and what is in the Cluster.Spec
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.Info("Reconcile RaftProtocol")
-	storage := &storagev2beta1.RaftProtocol{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, storage)
+	raft := &storagev2beta1.RaftProtocol{}
+	err := r.client.Get(context.TODO(), request.NamespacedName, raft)
 	if err != nil {
 		log.Error(err, "Reconcile RaftProtocol")
 		if k8serrors.IsNotFound(err) {
@@ -89,19 +129,101 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	}
 
 	log.Info("Reconcile Clusters")
-	err = r.reconcileClusters(storage)
+	err = r.reconcileClusters(raft)
 	if err != nil {
 		log.Error(err, "Reconcile Clusters")
 		return reconcile.Result{}, err
 	}
 
+	log.Info("Reconcile Protocol")
+	err = r.reconcileProtocol(raft)
+	if err != nil {
+		log.Error(err, "Reconcile Protocol")
+		return reconcile.Result{}, err
+	}
+
 	log.Info("Reconcile Status")
-	err = r.reconcileStatus(storage)
+	err = r.reconcileStatus(raft)
 	if err != nil {
 		log.Error(err, "Reconcile Status")
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
+}
+
+func (r *Reconciler) reconcileProtocol(raft *storagev2beta1.RaftProtocol) error {
+	protocol := &v2beta1.Protocol{}
+	name := types.NamespacedName{
+		Namespace: raft.Namespace,
+		Name:      raft.Name,
+	}
+	err := r.client.Get(context.TODO(), name, protocol)
+	if k8serrors.IsNotFound(err) {
+		protocol = &v2beta1.Protocol{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: raft.Namespace,
+				Name:      raft.Name,
+			},
+			Spec: v2beta1.ProtocolSpec{
+				Driver: v2beta1.DriverSpec{
+					Name: driverName,
+				},
+				Replicas:   r.getProtocolReplicas(raft),
+				Partitions: r.getProtocolPartitions(raft),
+			},
+		}
+		if err := controllerutil.SetOwnerReference(raft, protocol, r.scheme); err != nil {
+			return err
+		}
+		return r.client.Create(context.TODO(), protocol)
+	} else if err == nil {
+		protocol.Spec.Replicas = r.getProtocolReplicas(raft)
+		protocol.Spec.Partitions = r.getProtocolPartitions(raft)
+		return r.client.Update(context.TODO(), protocol)
+	}
+	return err
+}
+
+func (r *Reconciler) getProtocolReplicas(raft *storagev2beta1.RaftProtocol) []v2beta1.ReplicaSpec {
+	numClusters := getClusters(raft)
+	numReplicas := getReplicas(raft)
+	replicas := make([]v2beta1.ReplicaSpec, 0, numReplicas*numClusters)
+	for i := 0; i < numClusters; i++ {
+		for j := 0; j < numReplicas; j++ {
+			host := getPodDNSName(raft, j, i)
+			port := int32(apiPort)
+			replica := v2beta1.ReplicaSpec{
+				ID:   getPodName(raft, j, i),
+				Host: &host,
+				Port: &port,
+				ExtraPorts: map[string]int32{
+					protocolPortName: protocolPort,
+				},
+			}
+			replicas = append(replicas, replica)
+		}
+	}
+	return replicas
+}
+
+func (r *Reconciler) getProtocolPartitions(raft *storagev2beta1.RaftProtocol) []v2beta1.PartitionSpec {
+	numClusters := getClusters(raft)
+	numReplicas := getReplicas(raft)
+	partitions := make([]v2beta1.PartitionSpec, 0, raft.Spec.Partitions)
+	for partitionID := 1; partitionID <= int(raft.Spec.Partitions); partitionID++ {
+		for i := 0; i < numClusters; i++ {
+			replicaNames := make([]string, 0, numReplicas)
+			for j := 0; j < numReplicas; j++ {
+				replicaNames = append(replicaNames, getPodName(raft, j, i))
+			}
+			partition := v2beta1.PartitionSpec{
+				ID:       uint32(partitionID),
+				Replicas: replicaNames,
+			}
+			partitions = append(partitions, partition)
+		}
+	}
+	return partitions
 }
 
 func (r *Reconciler) reconcileClusters(storage *storagev2beta1.RaftProtocol) error {
@@ -450,6 +572,14 @@ func getClusters(storage *storagev2beta1.RaftProtocol) int {
 		return 1
 	}
 	return int(storage.Spec.Clusters)
+}
+
+// getReplicas returns the number of replicas in the given database
+func getReplicas(storage *storagev2beta1.RaftProtocol) int {
+	if storage.Spec.Replicas == 0 {
+		return 1
+	}
+	return int(storage.Spec.Replicas)
 }
 
 // getClusterForPartitionID returns the cluster ID for the given partition ID
