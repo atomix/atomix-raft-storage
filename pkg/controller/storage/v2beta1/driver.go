@@ -43,7 +43,7 @@ const (
 )
 
 const (
-	defaultDriverImage = "atomix/raft-driver:latest"
+	defaultDriverImage = "atomix/dragonboat-raft-storage-driver:latest"
 	defaultDriverPort  = 5681
 )
 

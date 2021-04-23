@@ -188,12 +188,12 @@ func (r *Reconciler) getProtocolReplicas(raft *storagev2beta1.RaftProtocol) []v2
 	numClusters := getClusters(raft)
 	numReplicas := getReplicas(raft)
 	replicas := make([]v2beta1.ReplicaSpec, 0, numReplicas*numClusters)
-	for i := 0; i < numClusters; i++ {
+	for i := 1; i <= numClusters; i++ {
 		for j := 0; j < numReplicas; j++ {
-			host := getPodDNSName(raft, j, i)
+			host := getPodDNSName(raft, i, j)
 			port := int32(apiPort)
 			replica := v2beta1.ReplicaSpec{
-				ID:   getPodName(raft, j, i),
+				ID:   getPodName(raft, i, j),
 				Host: &host,
 				Port: &port,
 				ExtraPorts: map[string]int32{
@@ -211,10 +211,10 @@ func (r *Reconciler) getProtocolPartitions(raft *storagev2beta1.RaftProtocol) []
 	numReplicas := getReplicas(raft)
 	partitions := make([]v2beta1.PartitionSpec, 0, raft.Spec.Partitions)
 	for partitionID := 1; partitionID <= int(raft.Spec.Partitions); partitionID++ {
-		for i := 0; i < numClusters; i++ {
+		for i := 1; i <= numClusters; i++ {
 			replicaNames := make([]string, 0, numReplicas)
 			for j := 0; j < numReplicas; j++ {
-				replicaNames = append(replicaNames, getPodName(raft, j, i))
+				replicaNames = append(replicaNames, getPodName(raft, i, j))
 			}
 			partition := v2beta1.PartitionSpec{
 				ID:       uint32(partitionID),
@@ -305,7 +305,7 @@ func (r *Reconciler) addConfigMap(storage *storagev2beta1.RaftProtocol, cluster 
 func newNodeConfigString(storage *storagev2beta1.RaftProtocol, cluster int) (string, error) {
 	replicas := make([]protocolapi.ProtocolReplica, storage.Spec.Replicas)
 	replicaNames := make([]string, storage.Spec.Replicas)
-	for i := 0; i < int(storage.Spec.Replicas); i++ {
+	for i := 0; i < getReplicas(storage); i++ {
 		replicas[i] = protocolapi.ProtocolReplica{
 			ID:      getPodName(storage, cluster, i),
 			Host:    getPodDNSName(storage, cluster, i),
