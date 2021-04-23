@@ -20,9 +20,8 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	core "github.com/atomix/kubernetes-controller/pkg/apis/core/v2beta1"
 	primitives "github.com/atomix/kubernetes-controller/pkg/apis/primitives/v2beta1"
+	logutil "github.com/atomix/kubernetes-controller/pkg/controller/util/log"
 	storagev2beta1 "github.com/atomix/raft-storage-controller/pkg/controller/storage/v2beta1"
-
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	storagev1beta1 "github.com/atomix/raft-storage-controller/pkg/controller/storage/v1beta1"
 
@@ -39,7 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
-var log = logf.Log.WithName("cmd")
+var log = logging.GetLogger("main")
 
 func printVersion() {
 	log.Info(fmt.Sprintf("Go Version: %s", runtime.Version()))
@@ -48,8 +47,8 @@ func printVersion() {
 
 func main() {
 	logging.SetLevel(logging.DebugLevel)
+	logf.SetLogger(logutil.NewControllerLogger("atomix", "controller", "raft"))
 
-	logf.SetLogger(zap.New())
 	var namespace string
 	if len(os.Args) > 1 {
 		namespace = os.Args[1]

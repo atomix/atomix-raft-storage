@@ -145,18 +145,10 @@ rules:
   verbs:
   - '*'
 - apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles
-  - rolebindings
-  - clusterroles
-  - clusterrolebindings
-  verbs:
-  - '*'
-- apiGroups:
   - cloud.atomix.io
   - storage.cloud.atomix.io
   - atomix.io
+  - primitives.atomix.io
   - storage.atomix.io
   resources:
   - '*'
@@ -222,7 +214,7 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: WEBHOOK_NAME
-          value: driver-injector.raftprotocols.storage.k8s.atomix.io
+          value: injector.raft.driver.atomix.io
         - name: WEBHOOK_PATH
           value: /inject-driver
         - name: POD_NAME
@@ -264,7 +256,7 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: WEBHOOK_NAME
-          value: driver-injector.raftprotocols.storage.atomix.io
+          value: injector.raft.driver.atomix.io
         - name: WEBHOOK_PATH
           value: /inject-driver
         - name: POD_NAME
@@ -288,7 +280,7 @@ kind: MutatingWebhookConfiguration
 metadata:
   name: raft-storage-controller
 webhooks:
-- name: driver.raft.storage.atomix.io
+- name: injector.raft.driver.atomix.io
   rules:
   - operations: ["CREATE"]
     apiGroups: [""]
@@ -299,23 +291,7 @@ webhooks:
     service:
       name: raft-storage-controller
       namespace: kube-system
-      path: /create-pod
-  admissionReviewVersions: ["v1beta1"]
-  sideEffects: None
-  failurePolicy: Ignore
-  timeoutSeconds: 10
-- name: primitives.raft.storage.atomix.io
-  rules:
-  - operations: ["CREATE"]
-    apiGroups: ["primitives.atomix.io"]
-    apiVersions: ["v2beta1"]
-    resources: ["*"]
-    scope: Namespaced
-  clientConfig:
-    service:
-      name: raft-storage-controller
-      namespace: kube-system
-      path: /create-primitive
+      path: /inject-driver
   admissionReviewVersions: ["v1beta1"]
   sideEffects: None
   failurePolicy: Ignore
