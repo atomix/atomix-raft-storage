@@ -81,16 +81,7 @@ func addRaftProtocolController(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to the storage resource and enqueue Clusters that reference it
-	err = c.Watch(&source.Kind{Type: &storagev2beta1.RaftProtocol{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to secondary resource Protocol
-	err = c.Watch(&source.Kind{Type: &v2beta1.Protocol{}}, &handler.EnqueueRequestForOwner{
-		OwnerType:    &storagev2beta1.RaftProtocol{},
-		IsController: true,
-	})
+	err = c.Watch(&source.Kind{Type: &v2beta1.Store{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -117,9 +108,9 @@ type Reconciler struct {
 // Reconcile reads that state of the cluster for a Cluster object and makes changes based on the state read
 // and what is in the Cluster.Spec
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info("Reconcile RaftProtocol")
-	raft := &storagev2beta1.RaftProtocol{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, raft)
+	log.Info("Reconcile Store")
+	store := &v2beta1.Store{}
+	err := r.client.Get(context.TODO(), request.NamespacedName, store)
 	if err != nil {
 		log.Error(err, "Reconcile RaftProtocol")
 		if k8serrors.IsNotFound(err) {
@@ -129,71 +120,84 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 	}
 
 	log.Info("Reconcile Clusters")
-	err = r.reconcileClusters(raft)
+	protocol := &storagev2beta1.RaftProtocol{}
+	err = json.Unmarshal(store.Spec.Protocol.Raw, protocol)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	err = r.reconcileClusters(store, protocol)
 	if err != nil {
 		log.Error(err, "Reconcile Clusters")
 		return reconcile.Result{}, err
 	}
 
 	log.Info("Reconcile Protocol")
-	err = r.reconcileProtocol(raft)
+	err = r.reconcileStatus(store, protocol)
 	if err != nil {
 		log.Error(err, "Reconcile Protocol")
-		return reconcile.Result{}, err
-	}
-
-	log.Info("Reconcile Status")
-	err = r.reconcileStatus(raft)
-	if err != nil {
-		log.Error(err, "Reconcile Status")
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
 }
 
-func (r *Reconciler) reconcileProtocol(raft *storagev2beta1.RaftProtocol) error {
-	protocol := &v2beta1.Protocol{}
-	name := types.NamespacedName{
-		Namespace: raft.Namespace,
-		Name:      raft.Name,
+func (r *Reconciler) reconcileStatus(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol) error {
+	replicas := r.getProtocolReplicas(store, protocol)
+	partitions := r.getProtocolPartitions(store, protocol)
+	if !isReplicasEqual(store.Status.Protocol.Replicas, replicas) || !isPartitionsEqual(store.Status.Protocol.Partitions, partitions) {
+		store.Status.Protocol.Replicas = replicas
+		store.Status.Protocol.Partitions = partitions
+		return r.client.Status().Update(context.TODO(), store)
 	}
-	err := r.client.Get(context.TODO(), name, protocol)
-	if k8serrors.IsNotFound(err) {
-		protocol = &v2beta1.Protocol{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: raft.Namespace,
-				Name:      raft.Name,
-			},
-			Spec: v2beta1.ProtocolSpec{
-				Driver: v2beta1.DriverSpec{
-					Name: driverName,
-				},
-				Replicas:   r.getProtocolReplicas(raft),
-				Partitions: r.getProtocolPartitions(raft),
-			},
-		}
-		if err := controllerutil.SetOwnerReference(raft, protocol, r.scheme); err != nil {
-			return err
-		}
-		return r.client.Create(context.TODO(), protocol)
-	} else if err == nil {
-		protocol.Spec.Replicas = r.getProtocolReplicas(raft)
-		protocol.Spec.Partitions = r.getProtocolPartitions(raft)
-		return r.client.Update(context.TODO(), protocol)
-	}
-	return err
+	return nil
 }
 
-func (r *Reconciler) getProtocolReplicas(raft *storagev2beta1.RaftProtocol) []v2beta1.ReplicaSpec {
-	numClusters := getClusters(raft)
-	numReplicas := getReplicas(raft)
-	replicas := make([]v2beta1.ReplicaSpec, 0, numReplicas*numClusters)
+func isReplicasEqual(a, b []v2beta1.ReplicaStatus) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		ar := a[i]
+		br := b[i]
+		if ar.ID != br.ID || ar.Host != br.Host || ar.Port != br.Port {
+			return false
+		}
+	}
+	return true
+}
+
+func isPartitionsEqual(a, b []v2beta1.PartitionStatus) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		ap := a[i]
+		bp := b[i]
+		if ap.ID != bp.ID {
+			return false
+		}
+		if len(ap.Replicas) != len(bp.Replicas) {
+			return false
+		}
+		for j := 0; j < len(ap.Replicas); j++ {
+			if ap.Replicas[j] != bp.Replicas[j] {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (r *Reconciler) getProtocolReplicas(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol) []v2beta1.ReplicaStatus {
+	numClusters := getClusters(protocol)
+	numReplicas := getReplicas(protocol)
+	replicas := make([]v2beta1.ReplicaStatus, 0, numReplicas*numClusters)
 	for i := 1; i <= numClusters; i++ {
 		for j := 0; j < numReplicas; j++ {
-			host := getPodDNSName(raft, i, j)
+			host := getPodDNSName(store, protocol, i, j)
 			port := int32(apiPort)
-			replica := v2beta1.ReplicaSpec{
-				ID:   getPodName(raft, i, j),
+			replica := v2beta1.ReplicaStatus{
+				ID:   getPodName(store, protocol, i, j),
 				Host: &host,
 				Port: &port,
 				ExtraPorts: map[string]int32{
@@ -206,17 +210,17 @@ func (r *Reconciler) getProtocolReplicas(raft *storagev2beta1.RaftProtocol) []v2
 	return replicas
 }
 
-func (r *Reconciler) getProtocolPartitions(raft *storagev2beta1.RaftProtocol) []v2beta1.PartitionSpec {
-	numClusters := getClusters(raft)
-	numReplicas := getReplicas(raft)
-	partitions := make([]v2beta1.PartitionSpec, 0, raft.Spec.Partitions)
-	for partitionID := 1; partitionID <= int(raft.Spec.Partitions); partitionID++ {
+func (r *Reconciler) getProtocolPartitions(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol) []v2beta1.PartitionStatus {
+	numClusters := getClusters(protocol)
+	numReplicas := getReplicas(protocol)
+	partitions := make([]v2beta1.PartitionStatus, 0, protocol.Spec.Partitions)
+	for partitionID := 1; partitionID <= int(protocol.Spec.Partitions); partitionID++ {
 		for i := 1; i <= numClusters; i++ {
 			replicaNames := make([]string, 0, numReplicas)
 			for j := 0; j < numReplicas; j++ {
-				replicaNames = append(replicaNames, getPodName(raft, i, j))
+				replicaNames = append(replicaNames, getPodName(store, protocol, i, j))
 			}
-			partition := v2beta1.PartitionSpec{
+			partition := v2beta1.PartitionStatus{
 				ID:       uint32(partitionID),
 				Replicas: replicaNames,
 			}
@@ -226,10 +230,10 @@ func (r *Reconciler) getProtocolPartitions(raft *storagev2beta1.RaftProtocol) []
 	return partitions
 }
 
-func (r *Reconciler) reconcileClusters(storage *storagev2beta1.RaftProtocol) error {
-	clusters := getClusters(storage)
+func (r *Reconciler) reconcileClusters(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol) error {
+	clusters := getClusters(protocol)
 	for cluster := 1; cluster <= clusters; cluster++ {
-		err := r.reconcileCluster(storage, cluster)
+		err := r.reconcileCluster(store, protocol, cluster)
 		if err != nil {
 			return err
 		}
@@ -237,43 +241,43 @@ func (r *Reconciler) reconcileClusters(storage *storagev2beta1.RaftProtocol) err
 	return nil
 }
 
-func (r *Reconciler) reconcileCluster(storage *storagev2beta1.RaftProtocol, cluster int) error {
-	err := r.reconcileConfigMap(storage, cluster)
+func (r *Reconciler) reconcileCluster(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int) error {
+	err := r.reconcileConfigMap(store, protocol, cluster)
 	if err != nil {
 		return err
 	}
 
-	err = r.reconcileStatefulSet(storage, cluster)
+	err = r.reconcileStatefulSet(store, protocol, cluster)
 	if err != nil {
 		return err
 	}
 
-	err = r.reconcileService(storage, cluster)
+	err = r.reconcileService(store, protocol, cluster)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *Reconciler) reconcileConfigMap(storage *storagev2beta1.RaftProtocol, cluster int) error {
-	log.Info("Reconcile raft storage config map")
+func (r *Reconciler) reconcileConfigMap(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int) error {
+	log.Info("Reconcile raft protocol config map")
 	cm := &corev1.ConfigMap{}
 	name := types.NamespacedName{
-		Namespace: storage.Namespace,
-		Name:      getClusterName(storage, cluster),
+		Namespace: getProtocolNamespace(store, protocol),
+		Name:      getClusterName(store, protocol, cluster),
 	}
 	err := r.client.Get(context.TODO(), name, cm)
 	if err != nil && k8serrors.IsNotFound(err) {
-		err = r.addConfigMap(storage, cluster)
+		err = r.addConfigMap(store, protocol, cluster)
 	}
 	return err
 }
 
-func (r *Reconciler) addConfigMap(storage *storagev2beta1.RaftProtocol, cluster int) error {
-	log.Info("Creating raft ConfigMap", "Name", storage.Name, "Namespace", storage.Namespace)
+func (r *Reconciler) addConfigMap(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int) error {
+	log.Info("Creating raft ConfigMap", "Name", getProtocolName(store, protocol), "Namespace", getProtocolNamespace(store, protocol))
 	var config interface{}
 
-	clusterConfig, err := newNodeConfigString(storage, cluster)
+	clusterConfig, err := newNodeConfigString(store, protocol, cluster)
 	if err != nil {
 		return err
 	}
@@ -285,9 +289,9 @@ func (r *Reconciler) addConfigMap(storage *storagev2beta1.RaftProtocol, cluster 
 
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getClusterName(storage, cluster),
-			Namespace: storage.Namespace,
-			Labels:    newClusterLabels(storage, cluster),
+			Name:      getClusterName(store, protocol, cluster),
+			Namespace: getProtocolNamespace(store, protocol),
+			Labels:    newClusterLabels(store, protocol, cluster),
 		},
 		Data: map[string]string{
 			clusterConfigFile:  clusterConfig,
@@ -295,31 +299,31 @@ func (r *Reconciler) addConfigMap(storage *storagev2beta1.RaftProtocol, cluster 
 		},
 	}
 
-	if err := controllerutil.SetControllerReference(storage, cm, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(store, cm, r.scheme); err != nil {
 		return err
 	}
 	return r.client.Create(context.TODO(), cm)
 }
 
 // newNodeConfigString creates a node configuration string for the given cluster
-func newNodeConfigString(storage *storagev2beta1.RaftProtocol, cluster int) (string, error) {
-	replicas := make([]protocolapi.ProtocolReplica, storage.Spec.Replicas)
-	replicaNames := make([]string, storage.Spec.Replicas)
-	for i := 0; i < getReplicas(storage); i++ {
+func newNodeConfigString(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int) (string, error) {
+	replicas := make([]protocolapi.ProtocolReplica, protocol.Spec.Replicas)
+	replicaNames := make([]string, protocol.Spec.Replicas)
+	for i := 0; i < getReplicas(protocol); i++ {
 		replicas[i] = protocolapi.ProtocolReplica{
-			ID:      getPodName(storage, cluster, i),
-			Host:    getPodDNSName(storage, cluster, i),
+			ID:      getPodName(store, protocol, cluster, i),
+			Host:    getPodDNSName(store, protocol, cluster, i),
 			APIPort: apiPort,
 			ExtraPorts: map[string]int32{
 				protocolPortName: protocolPort,
 			},
 		}
-		replicaNames[i] = getPodName(storage, cluster, i)
+		replicaNames[i] = getPodName(store, protocol, cluster, i)
 	}
 
-	partitions := make([]protocolapi.ProtocolPartition, 0, storage.Spec.Partitions)
-	for partitionID := 1; partitionID <= int(storage.Spec.Partitions); partitionID++ {
-		if getClusterForPartitionID(storage, partitionID) == cluster {
+	partitions := make([]protocolapi.ProtocolPartition, 0, protocol.Spec.Partitions)
+	for partitionID := 1; partitionID <= int(protocol.Spec.Partitions); partitionID++ {
+		if getClusterForPartitionID(protocol, partitionID) == cluster {
 			partition := protocolapi.ProtocolPartition{
 				PartitionID: uint32(partitionID),
 				Replicas:    replicaNames,
@@ -346,25 +350,25 @@ func newProtocolConfigString(config interface{}) (string, error) {
 	return string(bytes), nil
 }
 
-func (r *Reconciler) reconcileStatefulSet(storage *storagev2beta1.RaftProtocol, cluster int) error {
-	log.Info("Reconcile raft storage stateful set")
+func (r *Reconciler) reconcileStatefulSet(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int) error {
+	log.Info("Reconcile raft protocol stateful set")
 	statefulSet := &appsv1.StatefulSet{}
 	name := types.NamespacedName{
-		Namespace: storage.Namespace,
-		Name:      getClusterName(storage, cluster),
+		Namespace: getProtocolNamespace(store, protocol),
+		Name:      getClusterName(store, protocol, cluster),
 	}
 	err := r.client.Get(context.TODO(), name, statefulSet)
 	if err != nil && k8serrors.IsNotFound(err) {
-		err = r.addStatefulSet(storage, cluster)
+		err = r.addStatefulSet(store, protocol, cluster)
 	}
 	return err
 }
 
-func (r *Reconciler) addStatefulSet(storage *storagev2beta1.RaftProtocol, cluster int) error {
-	log.Info("Creating raft replicas", "Name", storage.Name, "Namespace", storage.Namespace)
+func (r *Reconciler) addStatefulSet(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int) error {
+	log.Info("Creating raft replicas", "Name", getProtocolName(store, protocol), "Namespace", getProtocolNamespace(store, protocol))
 
-	image := getImage(storage)
-	pullPolicy := storage.Spec.ImagePullPolicy
+	image := getImage(protocol)
+	pullPolicy := protocol.Spec.ImagePullPolicy
 	if pullPolicy == "" {
 		pullPolicy = corev1.PullIfNotPresent
 	}
@@ -375,7 +379,7 @@ func (r *Reconciler) addStatefulSet(storage *storagev2beta1.RaftProtocol, cluste
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: getClusterName(storage, cluster),
+						Name: getClusterName(store, protocol, cluster),
 					},
 				},
 			},
@@ -385,8 +389,8 @@ func (r *Reconciler) addStatefulSet(storage *storagev2beta1.RaftProtocol, cluste
 	volumeClaimTemplates := []corev1.PersistentVolumeClaim{}
 
 	dataVolumeName := dataVolume
-	if storage.Spec.VolumeClaimTemplate != nil {
-		pvc := storage.Spec.VolumeClaimTemplate
+	if protocol.Spec.VolumeClaimTemplate != nil {
+		pvc := protocol.Spec.VolumeClaimTemplate
 		if pvc.Name == "" {
 			pvc.Name = dataVolume
 		} else {
@@ -404,15 +408,15 @@ func (r *Reconciler) addStatefulSet(storage *storagev2beta1.RaftProtocol, cluste
 
 	set := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getClusterName(storage, cluster),
-			Namespace: storage.Namespace,
-			Labels:    newClusterLabels(storage, cluster),
+			Name:      getClusterName(store, protocol, cluster),
+			Namespace: getProtocolNamespace(store, protocol),
+			Labels:    newClusterLabels(store, protocol, cluster),
 		},
 		Spec: appsv1.StatefulSetSpec{
-			ServiceName: getClusterHeadlessServiceName(storage, cluster),
-			Replicas:    &storage.Spec.Replicas,
+			ServiceName: getClusterHeadlessServiceName(store, protocol, cluster),
+			Replicas:    &protocol.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: newClusterLabels(storage, cluster),
+				MatchLabels: newClusterLabels(store, protocol, cluster),
 			},
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -420,7 +424,7 @@ func (r *Reconciler) addStatefulSet(storage *storagev2beta1.RaftProtocol, cluste
 			PodManagementPolicy: appsv1.ParallelPodManagement,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: newClusterLabels(storage, cluster),
+					Labels: newClusterLabels(store, protocol, cluster),
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -491,9 +495,9 @@ func (r *Reconciler) addStatefulSet(storage *storagev2beta1.RaftProtocol, cluste
 									Weight: 1,
 									PodAffinityTerm: corev1.PodAffinityTerm{
 										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: newClusterLabels(storage, cluster),
+											MatchLabels: newClusterLabels(store, protocol, cluster),
 										},
-										Namespaces:  []string{storage.Namespace},
+										Namespaces:  []string{getProtocolNamespace(store, protocol)},
 										TopologyKey: "kubernetes.io/hostname",
 									},
 								},
@@ -507,34 +511,34 @@ func (r *Reconciler) addStatefulSet(storage *storagev2beta1.RaftProtocol, cluste
 		},
 	}
 
-	if err := controllerutil.SetControllerReference(storage, set, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(store, set, r.scheme); err != nil {
 		return err
 	}
 	return r.client.Create(context.TODO(), set)
 }
 
-func (r *Reconciler) reconcileService(storage *storagev2beta1.RaftProtocol, cluster int) error {
-	log.Info("Reconcile raft storage headless service")
+func (r *Reconciler) reconcileService(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int) error {
+	log.Info("Reconcile raft protocol headless service")
 	service := &corev1.Service{}
 	name := types.NamespacedName{
-		Namespace: storage.Namespace,
-		Name:      getClusterHeadlessServiceName(storage, cluster),
+		Namespace: getProtocolNamespace(store, protocol),
+		Name:      getClusterHeadlessServiceName(store, protocol, cluster),
 	}
 	err := r.client.Get(context.TODO(), name, service)
 	if err != nil && k8serrors.IsNotFound(err) {
-		err = r.addService(storage, cluster)
+		err = r.addService(store, protocol, cluster)
 	}
 	return err
 }
 
-func (r *Reconciler) addService(storage *storagev2beta1.RaftProtocol, cluster int) error {
-	log.Info("Creating headless raft service", "Name", storage.Name, "Namespace", storage.Namespace)
+func (r *Reconciler) addService(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int) error {
+	log.Info("Creating headless raft service", "Name", protocol.Name, "Namespace", getProtocolNamespace(store, protocol))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getClusterHeadlessServiceName(storage, cluster),
-			Namespace: storage.Namespace,
-			Labels:    newClusterLabels(storage, cluster),
+			Name:      getClusterHeadlessServiceName(store, protocol, cluster),
+			Namespace: getProtocolNamespace(store, protocol),
+			Labels:    newClusterLabels(store, protocol, cluster),
 			Annotations: map[string]string{
 				"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
 			},
@@ -552,18 +556,14 @@ func (r *Reconciler) addService(storage *storagev2beta1.RaftProtocol, cluster in
 			},
 			PublishNotReadyAddresses: true,
 			ClusterIP:                "None",
-			Selector:                 newClusterLabels(storage, cluster),
+			Selector:                 newClusterLabels(store, protocol, cluster),
 		},
 	}
 
-	if err := controllerutil.SetControllerReference(storage, service, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(store, service, r.scheme); err != nil {
 		return err
 	}
 	return r.client.Create(context.TODO(), service)
-}
-
-func (r *Reconciler) reconcileStatus(storage *storagev2beta1.RaftProtocol) error {
-	return nil
 }
 
 // getClusters returns the number of clusters in the given database
@@ -583,47 +583,60 @@ func getReplicas(storage *storagev2beta1.RaftProtocol) int {
 }
 
 // getClusterForPartitionID returns the cluster ID for the given partition ID
-func getClusterForPartitionID(storage *storagev2beta1.RaftProtocol, partition int) int {
-	return (partition % getClusters(storage)) + 1
+func getClusterForPartitionID(protocol *storagev2beta1.RaftProtocol, partition int) int {
+	return (partition % getClusters(protocol)) + 1
 }
 
 // getClusterResourceName returns the given resource name for the given cluster
-func getClusterResourceName(storage *storagev2beta1.RaftProtocol, cluster int, resource string) string {
-	return fmt.Sprintf("%s-%s", getClusterName(storage, cluster), resource)
+func getClusterResourceName(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int, resource string) string {
+	return fmt.Sprintf("%s-%s", getClusterName(store, protocol, cluster), resource)
 }
 
 // getClusterName returns the cluster name
-func getClusterName(storage *storagev2beta1.RaftProtocol, cluster int) string {
-	return fmt.Sprintf("%s-%d", storage.Name, cluster)
+func getClusterName(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int) string {
+	return fmt.Sprintf("%s-%d", getProtocolName(store, protocol), cluster)
 }
 
 // getClusterHeadlessServiceName returns the headless service name for the given cluster
-func getClusterHeadlessServiceName(storage *storagev2beta1.RaftProtocol, cluster int) string {
-	return getClusterResourceName(storage, cluster, headlessServiceSuffix)
+func getClusterHeadlessServiceName(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int) string {
+	return getClusterResourceName(store, protocol, cluster, headlessServiceSuffix)
 }
 
 // getPodName returns the name of the pod for the given pod ID
-func getPodName(storage *storagev2beta1.RaftProtocol, cluster int, pod int) string {
-	return fmt.Sprintf("%s-%d", getClusterName(storage, cluster), pod)
+func getPodName(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int, pod int) string {
+	return fmt.Sprintf("%s-%d", getClusterName(store, protocol, cluster), pod)
 }
 
 // getPodDNSName returns the fully qualified DNS name for the given pod ID
-func getPodDNSName(storage *storagev2beta1.RaftProtocol, cluster int, pod int) string {
+func getPodDNSName(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int, pod int) string {
 	domain := os.Getenv(clusterDomainEnv)
 	if domain == "" {
 		domain = "cluster.local"
 	}
-	return fmt.Sprintf("%s-%d.%s.%s.svc.%s", getClusterName(storage, cluster), pod, getClusterHeadlessServiceName(storage, cluster), storage.Namespace, domain)
+	return fmt.Sprintf("%s-%d.%s.%s.svc.%s", getClusterName(store, protocol, cluster), pod, getClusterHeadlessServiceName(store, protocol, cluster), getProtocolNamespace(store, protocol), domain)
+}
+
+// getProtocolNamespace returns the namespace for the given protocol
+func getProtocolNamespace(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol) string {
+	return store.Namespace
+}
+
+// getProtocolName returns the name for the given protocol
+func getProtocolName(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol) string {
+	if protocol.Name != "" {
+		return protocol.Name
+	}
+	return store.Name
 }
 
 // newClusterLabels returns the labels for the given cluster
-func newClusterLabels(storage *storagev2beta1.RaftProtocol, cluster int) map[string]string {
+func newClusterLabels(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol, cluster int) map[string]string {
 	labels := make(map[string]string)
-	for key, value := range storage.Labels {
+	for key, value := range store.Labels {
 		labels[key] = value
 	}
 	labels[appLabel] = appAtomix
-	labels[databaseLabel] = fmt.Sprintf("%s.%s", storage.Name, storage.Namespace)
+	labels[databaseLabel] = fmt.Sprintf("%s.%s", getProtocolName(store, protocol), getProtocolNamespace(store, protocol))
 	labels[clusterLabel] = fmt.Sprint(cluster)
 	return labels
 }
