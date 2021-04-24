@@ -81,14 +81,17 @@ func addRaftProtocolController(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to the storage resource and enqueue Clusters that reference it
-	err = c.Watch(&source.Kind{Type: &v2beta1.Store{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &storagev2beta1.RaftProtocol{}}, &handler.EnqueueRequestForOwner{
+		OwnerType:    &v2beta1.Store{},
+		IsController: false,
+	})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to secondary resource StatefulSet
 	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
-		OwnerType:    &storagev2beta1.RaftProtocol{},
+		OwnerType:    &v2beta1.Store{},
 		IsController: false,
 	})
 	if err != nil {

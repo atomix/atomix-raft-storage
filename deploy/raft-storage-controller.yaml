@@ -94,6 +94,17 @@ spec:
                 x-kubernetes-preserve-unknown-fields: true
                 type: object
 ---
+apiVersion: atomix.io/v2beta1
+kind: StoragePlugin
+metadata:
+  name: raft.storage.atomix.io
+spec:
+  group: storage.atomix.io
+  kind: RaftProtocol
+  versions:
+  - name: v2beta1
+    driver: atomix/dragonboat-raft-storage-driver:latest
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -168,21 +179,6 @@ roleRef:
   name: raft-storage-controller
   apiGroup: rbac.authorization.k8s.io
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: raft-storage-controller
-  namespace: kube-system
-  labels:
-    name: raft-storage-controller
-spec:
-  selector:
-    name: raft-storage-controller
-  ports:
-  - name: webhook
-    port: 443
-    targetPort: 443
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -199,35 +195,6 @@ spec:
         name: raft-storage-controller
     spec:
       serviceAccountName: raft-storage-controller
-      initContainers:
-      - name: init-certs
-        image: atomix/kubernetes-controller-init:latest
-        imagePullPolicy: IfNotPresent
-        securityContext:
-          allowPrivilegeEscalation: false
-          runAsUser: 0
-        env:
-        - name: CONTROLLER_NAME
-          value: raft-storage-controller
-        - name: CONTROLLER_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: WEBHOOK_NAME
-          value: injector.raft.driver.atomix.io
-        - name: WEBHOOK_PATH
-          value: /inject-driver
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        volumeMounts:
-        - name: certs
-          mountPath: /etc/webhook/certs
       containers:
       - name: controller
         image: atomix/raft-storage-controller:latest
@@ -255,10 +222,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        - name: WEBHOOK_NAME
-          value: injector.raft.driver.atomix.io
-        - name: WEBHOOK_PATH
-          value: /inject-driver
         - name: POD_NAME
           valueFrom:
             fieldRef:
@@ -267,32 +230,3 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        volumeMounts:
-        - name: certs
-          mountPath: /tmp/k8s-webhook-server/serving-certs
-          readOnly: true
-      volumes:
-      - name: certs
-        emptyDir: {}
----
-apiVersion: admissionregistration.k8s.io/v1
-kind: MutatingWebhookConfiguration
-metadata:
-  name: raft-storage-controller
-webhooks:
-- name: injector.raft.driver.atomix.io
-  rules:
-  - operations: ["CREATE"]
-    apiGroups: [""]
-    apiVersions: ["v1"]
-    resources: ["pods"]
-    scope: Namespaced
-  clientConfig:
-    service:
-      name: raft-storage-controller
-      namespace: kube-system
-      path: /inject-driver
-  admissionReviewVersions: ["v1beta1"]
-  sideEffects: None
-  failurePolicy: Ignore
-  timeoutSeconds: 10

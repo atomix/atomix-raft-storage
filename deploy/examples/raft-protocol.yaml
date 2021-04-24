@@ -1,8 +1,0 @@
-apiVersion: storage.k8s.atomix.io/v2beta1
-kind: RaftProtocol
-metadata:
-  name: raft
-spec:
-  clusters: 1
-  partitions: 1
-  replicas: 3

@@ -24,9 +24,6 @@ var log = logging.GetLogger("atomix", "controller", "raft")
 // AddControllers creates a new Partition ManagementGroup and adds it to the Manager. The Manager will set fields on the ManagementGroup
 // and Start it when the Manager is Started.
 func AddControllers(mgr manager.Manager) error {
-	if err := addDriverController(mgr); err != nil {
-		return err
-	}
 	if err := addRaftProtocolController(mgr); err != nil {
 		return err
 	}
