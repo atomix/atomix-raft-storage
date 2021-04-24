@@ -147,9 +147,18 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 func (r *Reconciler) reconcileStatus(store *v2beta1.Store, protocol *storagev2beta1.RaftProtocol) error {
 	replicas := r.getProtocolReplicas(store, protocol)
 	partitions := r.getProtocolPartitions(store, protocol)
-	if !isReplicasEqual(store.Status.Protocol.Replicas, replicas) || !isPartitionsEqual(store.Status.Protocol.Partitions, partitions) {
-		store.Status.Protocol.Replicas = replicas
-		store.Status.Protocol.Partitions = partitions
+	if store.Status.Protocol == nil || !isReplicasEqual(store.Status.Protocol.Replicas, replicas) || !isPartitionsEqual(store.Status.Protocol.Partitions, partitions) {
+		var revision int64
+		if store.Status.Protocol != nil {
+			revision = store.Status.Protocol.Revision
+		}
+		revision++
+		store.Status.Protocol = &v2beta1.ProtocolStatus{
+			Revision:   revision,
+			Replicas:   replicas,
+			Partitions: partitions,
+		}
+		store.Status.Ready = true
 		return r.client.Status().Update(context.TODO(), store)
 	}
 	return nil
@@ -162,7 +171,7 @@ func isReplicasEqual(a, b []v2beta1.ReplicaStatus) bool {
 	for i := 0; i < len(a); i++ {
 		ar := a[i]
 		br := b[i]
-		if ar.ID != br.ID || ar.Host != br.Host || ar.Port != br.Port {
+		if ar.ID != br.ID {
 			return false
 		}
 	}
