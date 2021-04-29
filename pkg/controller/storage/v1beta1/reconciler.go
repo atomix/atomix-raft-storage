@@ -18,12 +18,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	cloudv1beta3 "github.com/atomix/kubernetes-controller/pkg/controller/cloud/v1beta3"
+	cloudv1beta3 "github.com/atomix/atomix-controller/pkg/controller/cloud/v1beta3"
 	"os"
 
 	api "github.com/atomix/api/proto/atomix/database"
-	"github.com/atomix/kubernetes-controller/pkg/apis/cloud/v1beta3"
-	"github.com/atomix/raft-storage-controller/pkg/apis/storage/v1beta1"
+	"github.com/atomix/atomix-controller/pkg/apis/cloud/v1beta3"
+	"github.com/atomix/atomix-raft-storage-plugin/pkg/apis/storage/v1beta1"
 	"github.com/gogo/protobuf/jsonpb"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -46,7 +46,7 @@ const (
 	protocolPort          = 5679
 	probePort             = 5679
 	defaultImageEnv       = "DEFAULT_NODE_IMAGE"
-	defaultImage          = "atomix/raft-storage-node:v0.5.3"
+	defaultImage          = "atomix/atomix-raft-storage-node:v0.5.3"
 	headlessServiceSuffix = "hs"
 	appLabel              = "app"
 	databaseLabel         = "database"

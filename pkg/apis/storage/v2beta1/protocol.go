@@ -19,8 +19,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// RaftProtocolSpec specifies a RaftProtocol configuration
-type RaftProtocolSpec struct {
+// MultiRaftProtocolSpec specifies a MultiRaftProtocol configuration
+type MultiRaftProtocolSpec struct {
 	// Clusters is the number of clusters to create
 	Clusters int32 `json:"clusters,omitempty"`
 
@@ -43,25 +43,25 @@ type RaftProtocolSpec struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// RaftProtocol is the Schema for the RaftProtocol API
+// MultiRaftProtocol is the Schema for the MultiRaftProtocol API
 // +k8s:openapi-gen=true
-type RaftProtocol struct {
+type MultiRaftProtocol struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              RaftProtocolSpec `json:"spec,omitempty"`
+	Spec              MultiRaftProtocolSpec `json:"spec,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// RaftProtocolList contains a list of RaftProtocol
-type RaftProtocolList struct {
+// MultiRaftProtocolList contains a list of MultiRaftProtocol
+type MultiRaftProtocolList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 
-	// Items is the RaftProtocol of items in the list
-	Items []RaftProtocol `json:"items"`
+	// Items is the MultiRaftProtocol of items in the list
+	Items []MultiRaftProtocol `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&RaftProtocol{}, &RaftProtocolList{})
+	SchemeBuilder.Register(&MultiRaftProtocol{}, &MultiRaftProtocolList{})
 }

@@ -15,7 +15,7 @@
 package apis
 
 import (
-	storagev2beta1 "github.com/atomix/raft-storage-controller/pkg/apis/storage/v2beta1"
+	storagev2beta1 "github.com/atomix/atomix-raft-storage-plugin/pkg/apis/storage/v2beta1"
 )
 
 func init() {
