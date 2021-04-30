@@ -109,7 +109,7 @@ spec:
   versions:
   - name: v2beta1
     driver:
-      image: atomix/dragonboat-raft-storage-driver:latest
+      image: atomix/atomix-raft-storage-driver:latest
 ---
 apiVersion: v1
 kind: ServiceAccount

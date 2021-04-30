@@ -20,6 +20,7 @@ import (
 	"fmt"
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	"github.com/atomix/atomix-controller/pkg/apis/core/v2beta1"
+	"k8s.io/utils/pointer"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -46,7 +47,7 @@ const (
 	protocolPort          = 5679
 	probePort             = 5679
 	defaultImageEnv       = "DEFAULT_NODE_IMAGE"
-	defaultImage          = "atomix/dragonboat-raft-storage-node:latest"
+	defaultImage          = "atomix/atomix-raft-storage-node:latest"
 	headlessServiceSuffix = "hs"
 	appLabel              = "app"
 	databaseLabel         = "database"
@@ -158,6 +159,8 @@ func (r *Reconciler) reconcileStatus(store *v2beta1.Store, protocol *storagev2be
 			Replicas:   replicas,
 			Partitions: partitions,
 		}
+		store.Status.Replicas = pointer.Int32Ptr(int32(len(replicas)))
+		store.Status.Partitions = pointer.Int32Ptr(int32(len(partitions)))
 		store.Status.Ready = true
 		return r.client.Status().Update(context.TODO(), store)
 	}
