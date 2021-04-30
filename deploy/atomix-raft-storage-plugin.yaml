@@ -114,14 +114,14 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: raft-storage-controller
+  name: atomix-raft-storage-controller
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: raft-storage-controller
+  name: atomix-raft-storage-controller
 rules:
 - apiGroups:
   - ""
@@ -175,44 +175,36 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: raft-storage-controller
+  name: atomix-raft-storage-controller
 subjects:
 - kind: ServiceAccount
-  name: raft-storage-controller
+  name: atomix-raft-storage-controller
   namespace: kube-system
 roleRef:
   kind: ClusterRole
-  name: raft-storage-controller
+  name: atomix-raft-storage-controller
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: raft-storage-controller
+  name: atomix-raft-storage-controller
   namespace: kube-system
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: raft-storage-controller
+      name: atomix-raft-storage-controller
   template:
     metadata:
       labels:
-        name: raft-storage-controller
+        name: atomix-raft-storage-controller
     spec:
-      serviceAccountName: raft-storage-controller
+      serviceAccountName: atomix-raft-storage-controller
       containers:
       - name: controller
         image: atomix/atomix-raft-storage-controller:latest
         imagePullPolicy: IfNotPresent
-        securityContext:
-          allowPrivilegeEscalation: false
-          runAsUser: 0
-        ports:
-        - containerPort: 5679
-          name: control
-        command:
-        - raft-storage-controller
         readinessProbe:
           exec:
             command:
@@ -223,7 +215,7 @@ spec:
           failureThreshold: 1
         env:
         - name: CONTROLLER_NAME
-          value: raft-storage-controller
+          value: atomix-raft-storage-controller
         - name: CONTROLLER_NAMESPACE
           valueFrom:
             fieldRef:
