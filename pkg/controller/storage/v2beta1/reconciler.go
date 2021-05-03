@@ -19,7 +19,8 @@ import (
 	"encoding/json"
 	"fmt"
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
-	"github.com/atomix/atomix-controller/pkg/apis/core/v2beta1"
+	corev2beta1 "github.com/atomix/atomix-controller/pkg/apis/core/v2beta1"
+	"k8s.io/utils/pointer"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -81,18 +82,15 @@ func addRaftProtocolController(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to the storage resource and enqueue Clusters that reference it
-	err = c.Watch(&source.Kind{Type: &storagev2beta1.MultiRaftProtocol{}}, &handler.EnqueueRequestForOwner{
-		OwnerType:    &v2beta1.Store{},
-		IsController: false,
-	})
+	err = c.Watch(&source.Kind{Type: &storagev2beta1.MultiRaftProtocol{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to secondary resource StatefulSet
 	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
-		OwnerType:    &v2beta1.Store{},
-		IsController: false,
+		OwnerType:    &storagev2beta1.MultiRaftProtocol{},
+		IsController: true,
 	})
 	if err != nil {
 		return err
@@ -102,7 +100,7 @@ func addRaftProtocolController(mgr manager.Manager) error {
 
 var _ reconcile.Reconciler = &Reconciler{}
 
-// Reconciler reconciles a Cluster object
+// Reconciler reconciles a MultiRaftProtocol object
 type Reconciler struct {
 	client client.Client
 	scheme *runtime.Scheme
@@ -111,7 +109,7 @@ type Reconciler struct {
 // Reconcile reads that state of the cluster for a Cluster object and makes changes based on the state read
 // and what is in the Cluster.Spec
 func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info("Reconcile Store")
+	log.Info("Reconcile MultiRaftProtocol")
 	protocol := &storagev2beta1.MultiRaftProtocol{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, protocol)
 	if err != nil {
@@ -119,7 +117,7 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 		if k8serrors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
-		return reconcile.Result{Requeue: true}, err
+		return reconcile.Result{}, err
 	}
 
 	log.Info("Reconcile Clusters")
@@ -139,20 +137,39 @@ func (r *Reconciler) Reconcile(request reconcile.Request) (reconcile.Result, err
 }
 
 func (r *Reconciler) reconcileStatus(protocol *storagev2beta1.MultiRaftProtocol) error {
-	replicas := r.getProtocolReplicas(protocol)
-	partitions := r.getProtocolPartitions(protocol)
-	if protocol.Status.ProtocolStatus == nil || !isReplicasEqual(protocol.Status.Replicas, replicas) || !isPartitionsEqual(protocol.Status.Partitions, partitions) {
-		protocol.Status.ProtocolStatus = &v2beta1.ProtocolStatus{
+	replicas, err := r.getProtocolReplicas(protocol)
+	if err != nil {
+		return err
+	}
+
+	partitions, err := r.getProtocolPartitions(protocol)
+	if err != nil {
+		return err
+	}
+
+	if protocol.Status.ProtocolStatus == nil ||
+		isReplicasChanged(protocol.Status.Replicas, replicas) ||
+		isPartitionsChanged(protocol.Status.Partitions, partitions) {
+		var revision int64
+		if protocol.Status.ProtocolStatus != nil {
+			revision = protocol.Status.ProtocolStatus.Revision
+		}
+		if protocol.Status.ProtocolStatus == nil ||
+			!isReplicasSame(protocol.Status.Replicas, replicas) ||
+			!isPartitionsSame(protocol.Status.Partitions, partitions) {
+			revision++
+		}
+		protocol.Status.ProtocolStatus = &corev2beta1.ProtocolStatus{
+			Revision:   revision,
 			Replicas:   replicas,
 			Partitions: partitions,
 		}
-		protocol.Status.Ready = true
 		return r.client.Status().Update(context.TODO(), protocol)
 	}
 	return nil
 }
 
-func isReplicasEqual(a, b []v2beta1.ReplicaStatus) bool {
+func isReplicasSame(a, b []corev2beta1.ReplicaStatus) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -166,7 +183,24 @@ func isReplicasEqual(a, b []v2beta1.ReplicaStatus) bool {
 	return true
 }
 
-func isPartitionsEqual(a, b []v2beta1.PartitionStatus) bool {
+func isReplicasChanged(a, b []corev2beta1.ReplicaStatus) bool {
+	if len(a) != len(b) {
+		return true
+	}
+	for i := 0; i < len(a); i++ {
+		ar := a[i]
+		br := b[i]
+		if ar.ID != br.ID {
+			return true
+		}
+		if ar.Ready != br.Ready {
+			return true
+		}
+	}
+	return false
+}
+
+func isPartitionsSame(a, b []corev2beta1.PartitionStatus) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -188,46 +222,103 @@ func isPartitionsEqual(a, b []v2beta1.PartitionStatus) bool {
 	return true
 }
 
-func (r *Reconciler) getProtocolReplicas(protocol *storagev2beta1.MultiRaftProtocol) []v2beta1.ReplicaStatus {
+func isPartitionsChanged(a, b []corev2beta1.PartitionStatus) bool {
+	if len(a) != len(b) {
+		return true
+	}
+	for i := 0; i < len(a); i++ {
+		ap := a[i]
+		bp := b[i]
+		if ap.ID != bp.ID {
+			return true
+		}
+		if len(ap.Replicas) != len(bp.Replicas) {
+			return true
+		}
+		for j := 0; j < len(ap.Replicas); j++ {
+			if ap.Replicas[j] != bp.Replicas[j] {
+				return true
+			}
+		}
+		if ap.Ready != bp.Ready {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Reconciler) getProtocolReplicas(protocol *storagev2beta1.MultiRaftProtocol) ([]corev2beta1.ReplicaStatus, error) {
 	numClusters := getClusters(protocol)
 	numReplicas := getReplicas(protocol)
-	replicas := make([]v2beta1.ReplicaStatus, 0, numReplicas*numClusters)
+	replicas := make([]corev2beta1.ReplicaStatus, 0, numReplicas*numClusters)
 	for i := 1; i <= numClusters; i++ {
 		for j := 0; j < numReplicas; j++ {
-			host := getPodDNSName(protocol, i, j)
-			port := int32(apiPort)
-			replica := v2beta1.ReplicaStatus{
+			replicaReady, err := r.isReplicaReady(protocol, i, j)
+			if err != nil {
+				return nil, err
+			}
+			replica := corev2beta1.ReplicaStatus{
 				ID:   getPodName(protocol, i, j),
-				Host: &host,
-				Port: &port,
+				Host: pointer.StringPtr(getPodDNSName(protocol, i, j)),
+				Port: pointer.Int32Ptr(int32(apiPort)),
 				ExtraPorts: map[string]int32{
 					protocolPortName: protocolPort,
 				},
+				Ready: replicaReady,
 			}
 			replicas = append(replicas, replica)
 		}
 	}
-	return replicas
+	return replicas, nil
 }
 
-func (r *Reconciler) getProtocolPartitions(protocol *storagev2beta1.MultiRaftProtocol) []v2beta1.PartitionStatus {
+func (r *Reconciler) getProtocolPartitions(protocol *storagev2beta1.MultiRaftProtocol) ([]corev2beta1.PartitionStatus, error) {
 	numClusters := getClusters(protocol)
 	numReplicas := getReplicas(protocol)
-	partitions := make([]v2beta1.PartitionStatus, 0, protocol.Spec.Partitions)
+	partitions := make([]corev2beta1.PartitionStatus, 0, protocol.Spec.Partitions)
 	for partitionID := 1; partitionID <= int(protocol.Spec.Partitions); partitionID++ {
 		for i := 1; i <= numClusters; i++ {
+			partitionReady := true
 			replicaNames := make([]string, 0, numReplicas)
 			for j := 0; j < numReplicas; j++ {
+				replicaReady, err := r.isReplicaReady(protocol, i, j)
+				if err != nil {
+					return nil, err
+				} else if !replicaReady {
+					partitionReady = false
+				}
 				replicaNames = append(replicaNames, getPodName(protocol, i, j))
 			}
-			partition := v2beta1.PartitionStatus{
+			partition := corev2beta1.PartitionStatus{
 				ID:       uint32(partitionID),
 				Replicas: replicaNames,
+				Ready:    partitionReady,
 			}
 			partitions = append(partitions, partition)
 		}
 	}
-	return partitions
+	return partitions, nil
+}
+
+func (r *Reconciler) isReplicaReady(protocol *storagev2beta1.MultiRaftProtocol, cluster int, replica int) (bool, error) {
+	podName := types.NamespacedName{
+		Namespace: protocol.Namespace,
+		Name:      getPodName(protocol, cluster, replica),
+	}
+	pod := &corev1.Pod{}
+	if err := r.client.Get(context.TODO(), podName, pod); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady {
+			return condition.Status == corev1.ConditionTrue, nil
+		}
+	}
+	return false, nil
 }
 
 func (r *Reconciler) reconcileClusters(protocol *storagev2beta1.MultiRaftProtocol) error {
