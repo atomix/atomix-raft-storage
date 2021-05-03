@@ -15,6 +15,7 @@
 package v2beta1
 
 import (
+	"github.com/atomix/atomix-controller/pkg/apis/core/v2beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -40,6 +41,11 @@ type MultiRaftProtocolSpec struct {
 	VolumeClaimTemplate *corev1.PersistentVolumeClaim `json:"volumeClaimTemplate,omitempty"`
 }
 
+// MultiRaftProtocolStatus defines the status of a MultiRaftProtocol
+type MultiRaftProtocolStatus struct {
+	*v2beta1.ProtocolStatus `json:",inline"`
+}
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -48,7 +54,8 @@ type MultiRaftProtocolSpec struct {
 type MultiRaftProtocol struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              MultiRaftProtocolSpec `json:"spec,omitempty"`
+	Spec              MultiRaftProtocolSpec   `json:"spec,omitempty"`
+	Status            MultiRaftProtocolStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
