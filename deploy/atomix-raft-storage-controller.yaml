@@ -1,3 +1,4 @@
+# This file is deprecated. Use atomix-raft-storage-plugin.yaml instead
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:

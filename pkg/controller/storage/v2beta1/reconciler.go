@@ -477,7 +477,7 @@ func (r *Reconciler) addStatefulSet(protocol *storagev2beta1.MultiRaftProtocol, 
 		},
 	}
 
-	volumeClaimTemplates := []corev1.PersistentVolumeClaim{}
+	var volumeClaimTemplates []corev1.PersistentVolumeClaim
 
 	dataVolumeName := dataVolume
 	if protocol.Spec.VolumeClaimTemplate != nil {
@@ -567,6 +567,7 @@ func (r *Reconciler) addStatefulSet(protocol *storagev2beta1.MultiRaftProtocol, 
 								InitialDelaySeconds: 60,
 								TimeoutSeconds:      10,
 							},
+							SecurityContext: protocol.Spec.SecurityContext,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      dataVolumeName,
@@ -595,7 +596,8 @@ func (r *Reconciler) addStatefulSet(protocol *storagev2beta1.MultiRaftProtocol, 
 							},
 						},
 					},
-					Volumes: volumes,
+					ImagePullSecrets: protocol.Spec.ImagePullSecrets,
+					Volumes:          volumes,
 				},
 			},
 			VolumeClaimTemplates: volumeClaimTemplates,

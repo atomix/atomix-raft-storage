@@ -37,6 +37,12 @@ type MultiRaftProtocolSpec struct {
 	// ImagePullPolicy is the pull policy to apply
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
+	// ImagePullSecrets is a list of secrets for pulling images
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
+	// SecurityContext is a pod security context
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
 	// VolumeClaimTemplate is the volume claim template for Raft logs
 	VolumeClaimTemplate *corev1.PersistentVolumeClaim `json:"volumeClaimTemplate,omitempty"`
 }
