@@ -47,7 +47,7 @@ const (
 	protocolPort          = 5679
 	probePort             = 5679
 	defaultImageEnv       = "DEFAULT_NODE_IMAGE"
-	defaultImage          = "atomix/atomix-raft-storage-node:v0.6.1"
+	defaultImage          = "atomix/atomix-raft-storage-node:v0.6.3"
 	headlessServiceSuffix = "hs"
 	appLabel              = "app"
 	databaseLabel         = "database"
