@@ -168,7 +168,7 @@ spec:
   versions:
   - name: v2beta1
     driver:
-      image: atomix/atomix-raft-storage-driver:v0.6.6
+      image: atomix/atomix-raft-storage-driver:v0.6.9
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -262,7 +262,7 @@ spec:
       serviceAccountName: atomix-raft-storage-controller
       containers:
       - name: controller
-        image: atomix/atomix-raft-storage-controller:v0.6.7
+        image: atomix/atomix-raft-storage-controller:v0.6.9
         imagePullPolicy: IfNotPresent
         readinessProbe:
           exec:
@@ -288,4 +288,4 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: DEFAULT_NODE_V2BETA1_IMAGE
-          value: atomix/atomix-raft-storage-node:v0.6.6
+          value: atomix/atomix-raft-storage-node:v0.6.9
