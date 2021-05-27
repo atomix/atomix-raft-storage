@@ -17,20 +17,20 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	core "github.com/atomix/atomix-controller/pkg/apis/core/v2beta1"
 	primitives "github.com/atomix/atomix-controller/pkg/apis/primitives/v2beta1"
 	logutil "github.com/atomix/atomix-controller/pkg/controller/util/log"
-	storagev2beta1 "github.com/atomix/atomix-raft-storage-plugin/pkg/controller/storage/v2beta1"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	storagev2beta1 "github.com/atomix/atomix-raft-storage/pkg/controller/storage/v2beta1"
 
-	storagev1beta1 "github.com/atomix/atomix-raft-storage-plugin/pkg/controller/storage/v1beta1"
+	storagev1beta1 "github.com/atomix/atomix-raft-storage/pkg/controller/storage/v1beta1"
 
 	"os"
 	"runtime"
 
 	"github.com/atomix/atomix-controller/pkg/controller/util/leader"
 	"github.com/atomix/atomix-controller/pkg/controller/util/ready"
-	"github.com/atomix/atomix-raft-storage-plugin/pkg/apis"
+	"github.com/atomix/atomix-raft-storage/pkg/apis"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"

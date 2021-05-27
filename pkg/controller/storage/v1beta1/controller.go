@@ -17,7 +17,7 @@ package v1beta1
 import (
 	"context"
 	"github.com/atomix/atomix-controller/pkg/apis/cloud/v1beta3"
-	"github.com/atomix/atomix-raft-storage-plugin/pkg/apis/storage/v1beta1"
+	"github.com/atomix/atomix-raft-storage/pkg/apis/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"

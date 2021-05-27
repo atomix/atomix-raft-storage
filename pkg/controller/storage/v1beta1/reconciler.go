@@ -23,7 +23,7 @@ import (
 
 	api "github.com/atomix/api/proto/atomix/database"
 	"github.com/atomix/atomix-controller/pkg/apis/cloud/v1beta3"
-	"github.com/atomix/atomix-raft-storage-plugin/pkg/apis/storage/v1beta1"
+	"github.com/atomix/atomix-raft-storage/pkg/apis/storage/v1beta1"
 	"github.com/gogo/protobuf/jsonpb"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
