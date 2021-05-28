@@ -13,9 +13,9 @@ all: build
 
 build: # @HELP build the source code
 build: deps
-	GOOS=linux GOARCH=amd64 go build -o build/_output/atomix-raft-storage-node ./cmd/atomix-raft-storage-node
-	GOOS=linux GOARCH=amd64 go build -o build/_output/atomix-raft-storage-driver ./cmd/atomix-raft-storage-driver
-	GOOS=linux GOARCH=amd64 go build -o build/_output/atomix-raft-storage-controller ./cmd/atomix-raft-storage-controller
+	GOOS=linux GOARCH=amd64 go build -gcflags=-trimpath=${GOPATH} -asmflags=-trimpath=${GOPATH} -o build/_output/atomix-raft-storage-node ./cmd/atomix-raft-storage-node
+	GOOS=linux GOARCH=amd64 go build -gcflags=-trimpath=${GOPATH} -asmflags=-trimpath=${GOPATH} -o build/_output/atomix-raft-storage-driver ./cmd/atomix-raft-storage-driver
+	GOOS=linux GOARCH=amd64 go build -gcflags=-trimpath=${GOPATH} -asmflags=-trimpath=${GOPATH} -o build/_output/atomix-raft-storage-controller ./cmd/atomix-raft-storage-controller
 
 deps: # @HELP ensure that the required dependencies are in place
 	go build -v ./...
