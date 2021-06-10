@@ -25,8 +25,8 @@ import (
 
 const clientTimeout = 30 * time.Second
 
-// newClient returns a new Raft consensus protocol client
-func newClient(clusterID uint64, nodeID uint64, node *dragonboat.NodeHost, members map[uint64]string, streams *streamManager) *Partition {
+// newPartition returns a new Raft consensus partition client
+func newPartition(clusterID uint64, nodeID uint64, node *dragonboat.NodeHost, members map[uint64]string, streams *streamManager) *Partition {
 	return &Partition{
 		clusterID: clusterID,
 		nodeID:    nodeID,
@@ -71,6 +71,7 @@ func (c *Partition) Leader() string {
 // ExecuteCommand executes a state machine command on the partition
 func (c *Partition) ExecuteCommand(ctx context.Context, input []byte, stream streams.WriteStream) error {
 	streamID, stream := c.streams.addStream(stream)
+	defer c.streams.removeStream(streamID)
 	entry := &Entry{
 		Value:     input,
 		StreamID:  streamID,
@@ -83,7 +84,6 @@ func (c *Partition) ExecuteCommand(ctx context.Context, input []byte, stream str
 	ctx, cancel := context.WithTimeout(ctx, clientTimeout)
 	defer cancel()
 	if _, err := c.node.SyncPropose(ctx, c.node.GetNoOPSession(c.clusterID), bytes); err != nil {
-		stream.Close()
 		return err
 	}
 	return nil
@@ -98,7 +98,6 @@ func (c *Partition) ExecuteQuery(ctx context.Context, input []byte, stream strea
 	ctx, cancel := context.WithTimeout(ctx, clientTimeout)
 	defer cancel()
 	if _, err := c.node.SyncRead(ctx, c.clusterID, query); err != nil {
-		stream.Close()
 		return err
 	}
 	return nil

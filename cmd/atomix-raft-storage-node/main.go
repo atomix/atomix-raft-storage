@@ -46,7 +46,7 @@ func main() {
 	protocolConfig := parseProtocolConfig()
 	raftConfig := parseRaftConfig()
 
-	cluster := cluster.NewCluster(protocolConfig, cluster.WithMemberID(nodeID))
+	cluster := cluster.NewCluster(cluster.NewNetwork(), protocolConfig, cluster.WithMemberID(nodeID))
 
 	// Create an Atomix node
 	node := rsm.NewNode(cluster, raft.NewProtocol(raftConfig))

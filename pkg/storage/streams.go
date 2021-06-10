@@ -41,13 +41,15 @@ func (r *streamManager) addStream(stream streams.WriteStream) (streamID, streams
 	defer r.mu.Unlock()
 	r.nextID++
 	streamID := r.nextID
-	stream = streams.NewCloserStream(stream, func(s streams.WriteStream) {
-		r.mu.Lock()
-		delete(r.streams, streamID)
-		r.mu.Unlock()
-	})
 	r.streams[streamID] = stream
 	return streamID, stream
+}
+
+// removeStream removes a stream by ID
+func (r *streamManager) removeStream(streamID streamID) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.streams, streamID)
 }
 
 // getStream gets a stream by ID

@@ -15,7 +15,6 @@
 package storage
 
 import (
-	"encoding/binary"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	protocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/stream"
@@ -23,17 +22,15 @@ import (
 	"github.com/lni/dragonboat/v3/statemachine"
 	"io"
 	"sync"
-	"time"
 )
 
 // newStateMachine returns a new primitive state machine
 func newStateMachine(cluster cluster.Cluster, partitionID protocol.PartitionID, registry *protocol.Registry, streams *streamManager) *StateMachine {
-	fsm := &StateMachine{
+	return &StateMachine{
 		partition: partitionID,
+		state:     protocol.NewManager(cluster, registry),
 		streams:   streams,
 	}
-	fsm.state = protocol.NewManager(cluster, registry, fsm)
-	return fsm
 }
 
 // StateMachine is a Raft state machine
@@ -41,24 +38,7 @@ type StateMachine struct {
 	partition protocol.PartitionID
 	state     *protocol.Manager
 	streams   *streamManager
-	index     protocol.Index
-	timestamp time.Time
 	mu        sync.Mutex
-}
-
-// PartitionID returns the partition ID for the state machine
-func (s *StateMachine) PartitionID() protocol.PartitionID {
-	return s.partition
-}
-
-// Index returns the current state machine index
-func (s *StateMachine) Index() protocol.Index {
-	return s.index
-}
-
-// Timestamp returns the current state machine time
-func (s *StateMachine) Timestamp() time.Time {
-	return s.timestamp
 }
 
 // Update updates the state machine state
@@ -72,11 +52,6 @@ func (s *StateMachine) Update(bytes []byte) (statemachine.Result, error) {
 	}
 
 	stream := s.streams.getStream(tsEntry.StreamID)
-
-	s.index++
-	if tsEntry.Timestamp.After(s.timestamp) {
-		s.timestamp = tsEntry.Timestamp
-	}
 	s.state.Command(tsEntry.Value, stream)
 	return statemachine.Result{}, nil
 }
@@ -92,44 +67,11 @@ func (s *StateMachine) Lookup(value interface{}) (interface{}, error) {
 
 // SaveSnapshot saves a snapshot of the state machine state
 func (s *StateMachine) SaveSnapshot(writer io.Writer, files statemachine.ISnapshotFileCollection, done <-chan struct{}) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	bytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(bytes, uint64(s.index))
-	if _, err := writer.Write(bytes); err != nil {
-		return err
-	}
-	binary.BigEndian.PutUint64(bytes, uint64(s.timestamp.Second()))
-	if _, err := writer.Write(bytes); err != nil {
-		return err
-	}
-	binary.BigEndian.PutUint64(bytes, uint64(s.timestamp.Nanosecond()))
-	if _, err := writer.Write(bytes); err != nil {
-		return err
-	}
 	return s.state.Snapshot(writer)
 }
 
 // RecoverFromSnapshot recovers the state machine state from a snapshot
 func (s *StateMachine) RecoverFromSnapshot(reader io.Reader, files []statemachine.SnapshotFile, done <-chan struct{}) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	bytes := make([]byte, 8)
-	if _, err := reader.Read(bytes); err != nil {
-		return err
-	}
-	s.index = protocol.Index(binary.BigEndian.Uint64(bytes))
-	if _, err := reader.Read(bytes); err != nil {
-		return err
-	}
-	secs := int64(binary.BigEndian.Uint64(bytes))
-	if _, err := reader.Read(bytes); err != nil {
-		return err
-	}
-	nanos := int64(binary.BigEndian.Uint64(bytes))
-	s.timestamp = time.Unix(secs, nanos)
 	return s.state.Install(reader)
 }
 

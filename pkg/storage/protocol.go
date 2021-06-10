@@ -121,7 +121,7 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 		streams := newStreamManager()
 		fsm := newStateMachine(c, protocol.PartitionID(clusterID), registry, streams)
 		p.mu.Lock()
-		p.clients[protocol.PartitionID(clusterID)] = newClient(clusterID, nodeID, node, clientMembers, streams)
+		p.clients[protocol.PartitionID(clusterID)] = newPartition(clusterID, nodeID, node, clientMembers, streams)
 		p.mu.Unlock()
 		return fsm
 	}

@@ -28,9 +28,6 @@ message Entry {
 
     // stream_id is the entry stream identifier
     uint64 stream_id = 2 [(gogoproto.customname) = "StreamID", (gogoproto.casttype) = "streamID"];
-
-    // timestamp is the entry timestamp
-    google.protobuf.Timestamp timestamp = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message CommandRequest {
