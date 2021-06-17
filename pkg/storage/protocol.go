@@ -15,14 +15,15 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	protocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/atomix/atomix-raft-storage/pkg/storage/config"
 	"github.com/lni/dragonboat/v3"
 	raftconfig "github.com/lni/dragonboat/v3/config"
-	"github.com/lni/dragonboat/v3/raftio"
 	"github.com/lni/dragonboat/v3/statemachine"
 	"sort"
 	"sync"
@@ -31,43 +32,113 @@ import (
 const dataDir = "/var/lib/atomix/data"
 const rttMillisecond = 200
 
+var log = logging.GetLogger("atomix", "raft")
+
 // NewProtocol returns a new Raft Protocol instance
 func NewProtocol(config config.ProtocolConfig) *Protocol {
-	return &Protocol{
+	protocol := &Protocol{
 		config:  config,
 		clients: make(map[protocol.PartitionID]*Partition),
 		servers: make(map[protocol.PartitionID]*Server),
 	}
+	protocol.listener = &raftEventListener{
+		protocol:  protocol,
+		listeners: make(map[int]chan<- RaftEvent),
+	}
+	return protocol
 }
 
 // Protocol is an implementation of the Client interface providing the Raft consensus protocol
 type Protocol struct {
 	protocol.Protocol
-	config  config.ProtocolConfig
-	mu      sync.RWMutex
-	clients map[protocol.PartitionID]*Partition
-	servers map[protocol.PartitionID]*Server
+	config          config.ProtocolConfig
+	mu              sync.RWMutex
+	replicas        []*cluster.Replica
+	clients         map[protocol.PartitionID]*Partition
+	servers         map[protocol.PartitionID]*Server
+	memberIDs       map[uint64]string
+	nodeIDs         map[string]uint64
+	memberAddresses map[uint64]string
+	listener        *raftEventListener
 }
 
-type startupListener struct {
-	ch   chan<- int
-	mu   sync.Mutex
-	done bool
+func (p *Protocol) watch(ctx context.Context, ch chan<- RaftEvent) {
+	p.listener.listen(ctx, ch)
 }
 
-func (l *startupListener) LeaderUpdated(info raftio.LeaderInfo) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if !l.done && info.LeaderID > 0 {
-		l.ch <- int(info.ClusterID)
+func (p *Protocol) getMemberIDs() map[uint64]string {
+	p.mu.RLock()
+	memberIDs := p.memberIDs
+	p.mu.RUnlock()
+	if memberIDs != nil {
+		return memberIDs
 	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.memberIDs != nil {
+		return p.memberIDs
+	}
+
+	p.memberIDs = make(map[uint64]string)
+	for i, replica := range p.replicas {
+		p.memberIDs[uint64(i+1)] = string(replica.ID)
+	}
+	return p.memberIDs
 }
 
-func (l *startupListener) close() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.done = true
-	close(l.ch)
+func (p *Protocol) getMemberID(id uint64) string {
+	return p.getMemberIDs()[id]
+}
+
+func (p *Protocol) getNodeIDs() map[string]uint64 {
+	p.mu.RLock()
+	nodeIDs := p.nodeIDs
+	p.mu.RUnlock()
+	if nodeIDs != nil {
+		return nodeIDs
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.nodeIDs != nil {
+		return p.nodeIDs
+	}
+
+	p.nodeIDs = make(map[string]uint64)
+	for i, replica := range p.replicas {
+		p.nodeIDs[string(replica.ID)] = uint64(i + 1)
+	}
+	return p.nodeIDs
+}
+
+func (p *Protocol) getNodeID(id string) uint64 {
+	return p.getNodeIDs()[id]
+}
+
+func (p *Protocol) getAddresses() map[uint64]string {
+	p.mu.RLock()
+	memberAddresses := p.memberAddresses
+	p.mu.RUnlock()
+	if memberAddresses != nil {
+		return memberAddresses
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.memberAddresses != nil {
+		return p.memberAddresses
+	}
+
+	p.memberAddresses = make(map[uint64]string)
+	for i, replica := range p.replicas {
+		p.memberAddresses[uint64(i+1)] = fmt.Sprintf("%s:%d", replica.Host, replica.GetPort("raft"))
+	}
+	return p.memberAddresses
+}
+
+func (p *Protocol) getAddress(id uint64) string {
+	return p.getAddresses()[id]
 }
 
 // Start starts the Raft protocol
@@ -87,29 +158,27 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 		return replicas[i].ID < replicas[j].ID
 	})
 
-	var nodeID uint64
-	clientMembers := make(map[uint64]string)
-	serverMembers := make(map[uint64]string)
-	for i, replica := range replicas {
-		clientMembers[uint64(i+1)] = string(replica.ID)
-		serverMembers[uint64(i+1)] = fmt.Sprintf("%s:%d", replica.Host, replica.GetPort("raft"))
-		if replica.ID == member.ID {
-			nodeID = uint64(i + 1)
-		}
-	}
+	p.mu.Lock()
+	p.replicas = replicas
+	p.mu.Unlock()
+
+	memberIDs := p.getMemberIDs()
+	memberAddresses := p.getAddresses()
+	nodeID := p.getNodeID(string(member.ID))
 
 	// Create a listener to wait for a leader to be elected
-	startupCh := make(chan int)
-	listener := &startupListener{
-		ch: startupCh,
-	}
+	eventCh := make(chan RaftEvent)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p.watch(ctx, eventCh)
 
 	nodeConfig := raftconfig.NodeHostConfig{
-		WALDir:            dataDir,
-		NodeHostDir:       dataDir,
-		RTTMillisecond:    rttMillisecond,
-		RaftAddress:       address,
-		RaftEventListener: listener,
+		WALDir:              dataDir,
+		NodeHostDir:         dataDir,
+		RTTMillisecond:      rttMillisecond,
+		RaftAddress:         address,
+		RaftEventListener:   p.listener,
+		SystemEventListener: p.listener,
 	}
 
 	node, err := dragonboat.NewNodeHost(nodeConfig)
@@ -120,8 +189,9 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 	fsmFactory := func(clusterID, nodeID uint64) statemachine.IStateMachine {
 		streams := newStreamManager()
 		fsm := newStateMachine(c, protocol.PartitionID(clusterID), registry, streams)
+		client := newPartition(clusterID, nodeID, node, memberIDs, streams)
 		p.mu.Lock()
-		p.clients[protocol.PartitionID(clusterID)] = newPartition(clusterID, nodeID, node, clientMembers, streams)
+		p.clients[protocol.PartitionID(clusterID)] = client
 		p.mu.Unlock()
 		return fsm
 	}
@@ -137,23 +207,26 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 			CompactionOverhead: p.config.GetSnapshotThresholdOrDefault() / 10,
 		}
 
-		server := newServer(uint64(partition.ID()), serverMembers, node, config, fsmFactory)
+		server := newServer(uint64(partition.ID()), memberAddresses, node, config, fsmFactory)
 		if err := server.Start(); err != nil {
 			return err
 		}
+		p.mu.Lock()
 		p.servers[protocol.PartitionID(partition.ID())] = server
+		p.mu.Unlock()
 	}
 
 	startedCh := make(chan struct{})
 	go func() {
-		startedPartitions := make(map[int]bool)
+		startedPartitions := make(map[uint64]bool)
 		started := false
-		for partitionID := range startupCh {
-			startedPartitions[partitionID] = true
-			if !started && len(startedPartitions) == len(p.servers) {
-				go listener.close()
-				close(startedCh)
-				started = true
+		for event := range eventCh {
+			if ready, ok := event.Event.(*RaftEvent_PartitionReady); ok {
+				startedPartitions[ready.PartitionReady.Partition] = true
+				if !started && len(startedPartitions) == len(p.servers) {
+					close(startedCh)
+					started = true
+				}
 			}
 		}
 	}()
@@ -172,13 +245,10 @@ func (p *Protocol) Partition(partitionID protocol.PartitionID) protocol.Partitio
 func (p *Protocol) Partitions() []protocol.Partition {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	partitions := make([]protocol.Partition, 0, len(p.clients))
-	for _, client := range p.clients {
-		partitions = append(partitions, client)
+	partitions := make([]protocol.Partition, len(p.clients))
+	for i := 0; i < len(p.clients); i++ {
+		partitions[i] = p.clients[protocol.PartitionID(i+1)]
 	}
-	sort.Slice(partitions, func(i, j int) bool {
-		return partitions[i].(*Partition).clusterID < partitions[j].(*Partition).clusterID
-	})
 	return partitions
 }
 

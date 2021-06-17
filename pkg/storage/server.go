@@ -42,10 +42,22 @@ type Server struct {
 
 // Start starts the server
 func (s *Server) Start() error {
-	return s.node.StartCluster(s.members, false, s.fsm, s.config)
+	log.Infof("Starting server for partition %d", s.clusterID)
+	err := s.node.StartCluster(s.members, false, s.fsm, s.config)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	return nil
 }
 
 // Stop stops the server
 func (s *Server) Stop() error {
-	return s.node.StopCluster(s.clusterID)
+	log.Infof("Stopping server for partition %d", s.clusterID)
+	err := s.node.StopCluster(s.clusterID)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	return nil
 }

@@ -49,6 +49,29 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  name: raftsessionconfigs.storage.cloud.atomix.io
+spec:
+  group: storage.cloud.atomix.io
+  names:
+    kind: RaftSessionConfig
+    listKind: RaftSessionConfigList
+    plural: raftsessionconfigs
+    singular: raftsessionconfig
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          syncReads:
+            type: boolean
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
   name: multiraftprotocols.storage.atomix.io
 spec:
   group: storage.atomix.io
@@ -115,6 +138,9 @@ spec:
           status:
             type: object
             properties:
+              state:
+                type: string
+                default: NotReady
               revision:
                 type: integer
               replicas:
@@ -157,6 +183,223 @@ spec:
                         type: string
                     ready:
                       type: boolean
+    additionalPrinterColumns:
+    - name: Status
+      type: string
+      description: The protocol state
+      jsonPath: .status.state
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: raftclusters.storage.atomix.io
+spec:
+  group: storage.atomix.io
+  names:
+    kind: RaftCluster
+    listKind: RaftClusterList
+    plural: raftclusters
+    singular: raftcluster
+  scope: Namespaced
+  versions:
+  - name: v2beta1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    schema:
+      openAPIV3Schema:
+        type: object
+        required:
+        - spec
+        properties:
+          spec:
+            type: object
+            required:
+            - clusterId
+            properties:
+              clusterId:
+                type: integer
+          status:
+            type: object
+            properties:
+              state:
+                type: string
+                default: NotReady
+    additionalPrinterColumns:
+    - name: ID
+      type: integer
+      description: The cluster ID
+      jsonPath: .spec.clusterId
+    - name: Status
+      type: string
+      description: The cluster state
+      jsonPath: .status.state
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: raftpartitions.storage.atomix.io
+spec:
+  group: storage.atomix.io
+  names:
+    kind: RaftPartition
+    listKind: RaftPartitionList
+    plural: raftpartitions
+    singular: raftpartition
+  scope: Namespaced
+  versions:
+  - name: v2beta1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    schema:
+      openAPIV3Schema:
+        type: object
+        required:
+        - spec
+        properties:
+          spec:
+            type: object
+            required:
+            - clusterId
+            - partitionId
+            properties:
+              clusterId:
+                type: integer
+              partitionId:
+                type: integer
+          status:
+            type: object
+            properties:
+              state:
+                type: string
+                default: NotReady
+              leader:
+                type: string
+              term:
+                type: integer
+    additionalPrinterColumns:
+    - name: ID
+      type: integer
+      description: The partition ID
+      jsonPath: .spec.partitionId
+    - name: Cluster
+      type: integer
+      description: The cluster to which the partition belongs
+      jsonPath: .spec.clusterId
+    - name: Leader
+      type: string
+      description: The current leader for the partition
+      jsonPath: .status.leader
+    - name: Term
+      type: integer
+      description: The current term for the partition
+      jsonPath: .status.term
+    - name: Status
+      type: string
+      description: The partition state
+      jsonPath: .status.state
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: raftmembers.storage.atomix.io
+spec:
+  group: storage.atomix.io
+  names:
+    kind: RaftMember
+    listKind: RaftMemberList
+    plural: raftmembers
+    singular: raftmember
+  scope: Namespaced
+  versions:
+  - name: v2beta1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    schema:
+      openAPIV3Schema:
+        type: object
+        required:
+        - spec
+        properties:
+          spec:
+            type: object
+            required:
+            - clusterId
+            - partitionId
+            - pod
+            properties:
+              clusterId:
+                type: integer
+              partitionId:
+                type: integer
+              memberId:
+                type: integer
+              pod:
+                type: string
+          status:
+            type: object
+            properties:
+              state:
+                type: string
+                default: NotReady
+              role:
+                type: string
+              leader:
+                type: string
+              term:
+                type: integer
+              index:
+                type: integer
+              lastUpdated:
+                type: string
+                format: date-time
+              lastSnapshotIndex:
+                type: integer
+              lastSnapshotTime:
+                type: string
+                format: date-time
+    additionalPrinterColumns:
+    - name: Pod
+      type: string
+      description: The pod to which the member belongs
+      jsonPath: .spec.pod
+    - name: Partition
+      type: integer
+      description: The partition to which the member belongs
+      jsonPath: .spec.partitionId
+    - name: Cluster
+      type: integer
+      description: The cluster to which the member belongs
+      jsonPath: .spec.clusterId
+    - name: Role
+      type: string
+      description: The member role
+      jsonPath: .status.role
+    - name: Leader
+      type: string
+      description: The current leader on the member
+      jsonPath: .status.leader
+    - name: Term
+      type: integer
+      description: The current term on the member
+      jsonPath: .status.term
+    - name: Snapshot Index
+      type: integer
+      description: The index at which the member last took a snapshot
+      jsonPath: .status.lastSnapshotIndex
+    - name: Snapshot Time
+      type: string
+      description: The last time the member took a snapshot
+      jsonPath: .status.lastSnapshotTime
+    - name: Status
+      type: string
+      description: The member state
+      jsonPath: .status.state
 ---
 apiVersion: atomix.io/v2beta1
 kind: StoragePlugin
@@ -168,7 +411,10 @@ spec:
     kind: MultiRaftProtocol
   drivers:
   - version: v2beta1
-    image: atomix/atomix-raft-storage-driver:v0.7.0
+    image: atomix/atomix-raft-storage-driver:latest
+    config:
+      group: storage.atomix.io
+      kind: RaftSessionConfig
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -262,7 +508,7 @@ spec:
       serviceAccountName: atomix-raft-storage-controller
       containers:
       - name: controller
-        image: atomix/atomix-raft-storage-controller:v0.7.0
+        image: atomix/atomix-raft-storage-controller:latest
         imagePullPolicy: IfNotPresent
         readinessProbe:
           exec:
@@ -288,4 +534,4 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: DEFAULT_NODE_V2BETA1_IMAGE
-          value: atomix/atomix-raft-storage-node:v0.7.0
+          value: atomix/atomix-raft-storage-node:latest

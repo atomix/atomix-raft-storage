@@ -17,7 +17,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/atomix/atomix-api/go/atomix/protocol"
+	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
@@ -34,10 +34,13 @@ import (
 	raft "github.com/atomix/atomix-raft-storage/pkg/storage"
 	"github.com/atomix/atomix-raft-storage/pkg/storage/config"
 	"github.com/gogo/protobuf/jsonpb"
+	"google.golang.org/grpc"
 	"io/ioutil"
 	"os"
 	"os/signal"
 )
+
+const monitoringPort = 5000
 
 func main() {
 	logging.SetLevel(logging.DebugLevel)
@@ -46,10 +49,23 @@ func main() {
 	protocolConfig := parseProtocolConfig()
 	raftConfig := parseRaftConfig()
 
-	cluster := cluster.NewCluster(cluster.NewNetwork(), protocolConfig, cluster.WithMemberID(nodeID))
+	// Configure the Raft protocol
+	protocol := raft.NewProtocol(raftConfig)
+
+	ctrlCluster := cluster.NewCluster(cluster.NewNetwork(), protocolapi.ProtocolConfig{}, cluster.WithMemberID(nodeID), cluster.WithPort(monitoringPort))
+	member, _ := ctrlCluster.Member()
+	err := member.Serve(cluster.WithService(func(server *grpc.Server) {
+		raft.RegisterRaftEventsServer(server, raft.NewEventServer(protocol))
+	}))
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	raftCluster := cluster.NewCluster(cluster.NewNetwork(), protocolConfig, cluster.WithMemberID(nodeID))
 
 	// Create an Atomix node
-	node := rsm.NewNode(cluster, raft.NewProtocol(raftConfig))
+	node := rsm.NewNode(raftCluster, protocol)
 
 	// Register primitives on the Atomix node
 	counter.RegisterService(node)
@@ -81,9 +97,9 @@ func main() {
 	}
 }
 
-func parseProtocolConfig() protocol.ProtocolConfig {
+func parseProtocolConfig() protocolapi.ProtocolConfig {
 	configFile := os.Args[2]
-	config := protocol.ProtocolConfig{}
+	config := protocolapi.ProtocolConfig{}
 	nodeBytes, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		fmt.Println(err)

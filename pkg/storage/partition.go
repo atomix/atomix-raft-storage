@@ -68,14 +68,13 @@ func (c *Partition) Leader() string {
 	return c.members[leader]
 }
 
-// ExecuteCommand executes a state machine command on the partition
-func (c *Partition) ExecuteCommand(ctx context.Context, input []byte, stream streams.WriteStream) error {
+// SyncCommand executes a state machine command on the partition
+func (c *Partition) SyncCommand(ctx context.Context, input []byte, stream streams.WriteStream) error {
 	streamID, stream := c.streams.addStream(stream)
 	defer c.streams.removeStream(streamID)
 	entry := &Entry{
-		Value:     input,
-		StreamID:  streamID,
-		Timestamp: time.Now(),
+		Value:    input,
+		StreamID: streamID,
 	}
 	bytes, err := proto.Marshal(entry)
 	if err != nil {
@@ -89,8 +88,8 @@ func (c *Partition) ExecuteCommand(ctx context.Context, input []byte, stream str
 	return nil
 }
 
-// ExecuteQuery executes a state machine query on the partition
-func (c *Partition) ExecuteQuery(ctx context.Context, input []byte, stream streams.WriteStream) error {
+// SyncQuery executes a state machine query on the partition
+func (c *Partition) SyncQuery(ctx context.Context, input []byte, stream streams.WriteStream) error {
 	query := queryContext{
 		value:  input,
 		stream: stream,
@@ -98,6 +97,20 @@ func (c *Partition) ExecuteQuery(ctx context.Context, input []byte, stream strea
 	ctx, cancel := context.WithTimeout(ctx, clientTimeout)
 	defer cancel()
 	if _, err := c.node.SyncRead(ctx, c.clusterID, query); err != nil {
+		return err
+	}
+	return nil
+}
+
+// StaleQuery executes a state machine query on the partition
+func (c *Partition) StaleQuery(ctx context.Context, input []byte, stream streams.WriteStream) error {
+	query := queryContext{
+		value:  input,
+		stream: stream,
+	}
+	ctx, cancel := context.WithTimeout(ctx, clientTimeout)
+	defer cancel()
+	if _, err := c.node.StaleRead(c.clusterID, query); err != nil {
 		return err
 	}
 	return nil

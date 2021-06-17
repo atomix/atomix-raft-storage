@@ -20,6 +20,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type MultiRaftProtocolState string
+
+const (
+	MultiRaftProtocolNotReady MultiRaftProtocolState = "NotReady"
+	MultiRaftProtocolReady    MultiRaftProtocolState = "Ready"
+)
+
 // MultiRaftProtocolSpec specifies a MultiRaftProtocol configuration
 type MultiRaftProtocolSpec struct {
 	// Clusters is the number of clusters to create
@@ -50,6 +57,7 @@ type MultiRaftProtocolSpec struct {
 // MultiRaftProtocolStatus defines the status of a MultiRaftProtocol
 type MultiRaftProtocolStatus struct {
 	*v2beta1.ProtocolStatus `json:",inline"`
+	State                   MultiRaftProtocolState `json:"state,omitempty"`
 }
 
 // +genclient

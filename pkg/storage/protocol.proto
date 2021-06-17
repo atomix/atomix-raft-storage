@@ -30,25 +30,125 @@ message Entry {
     uint64 stream_id = 2 [(gogoproto.customname) = "StreamID", (gogoproto.casttype) = "streamID"];
 }
 
-message CommandRequest {
-    bytes value = 1;
+service RaftEvents {
+    rpc Subscribe (SubscribeRequest) returns (stream RaftEvent);
 }
 
-message CommandResponse {
-    bytes value = 1;
-    string error = 2;
+message SubscribeRequest {
+
 }
 
-message QueryRequest {
-    bytes value = 1;
+message RaftEvent {
+    google.protobuf.Timestamp timestamp = 1 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+    oneof event {
+        PartitionReadyEvent partition_ready = 2;
+        LeaderUpdatedEvent leader_updated = 3;
+        MembershipChangedEvent membership_changed = 4;
+        SendSnapshotStartedEvent send_snapshot_started = 5;
+        SendSnapshotCompletedEvent send_snapshot_completed = 6;
+        SendSnapshotAbortedEvent send_snapshot_aborted = 7;
+        SnapshotReceivedEvent snapshot_received = 8;
+        SnapshotRecoveredEvent snapshot_recovered = 9;
+        SnapshotCreatedEvent snapshot_created = 10;
+        SnapshotCompactedEvent snapshot_compacted = 11;
+        LogCompactedEvent log_compacted = 12;
+        LogDBCompactedEvent logdb_compacted = 13;
+        ConnectionEstablishedEvent connection_established = 14;
+        ConnectionFailedEvent connection_failed = 15;
+    }
 }
 
-message QueryResponse {
-    bytes value = 1;
-    string error = 2;
+message PartitionEvent {
+    uint64 partition = 1;
 }
 
-service RaftProtocol {
-    rpc Command(CommandRequest) returns (CommandResponse);
-    rpc Query(QueryRequest) returns (QueryResponse);
+message PartitionReadyEvent {
+    PartitionEvent partition = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message MembershipChangedEvent {
+    PartitionEvent partition = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message LeaderEvent {
+    PartitionEvent partition = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint64 term = 2;
+    string leader = 3;
+}
+
+message LeaderUpdatedEvent {
+    LeaderEvent leader = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message SnapshotEvent {
+    PartitionEvent partition = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint64 index = 2;
+}
+
+message SendSnapshotStartedEvent {
+    SnapshotEvent snapshot = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    string to = 2;
+}
+
+message SendSnapshotCompletedEvent {
+    SnapshotEvent snapshot = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    string to = 2;
+}
+
+message SendSnapshotAbortedEvent {
+    SnapshotEvent snapshot = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    string to = 2;
+}
+
+message SnapshotReceivedEvent {
+    SnapshotEvent snapshot = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    string from = 2;
+}
+
+message SnapshotRecoveredEvent {
+    SnapshotEvent snapshot = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message SnapshotCreatedEvent {
+    SnapshotEvent snapshot = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message SnapshotCompactedEvent {
+    SnapshotEvent snapshot = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message LogEvent {
+    PartitionEvent partition = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    uint64 index = 2;
+}
+
+message LogCompactedEvent {
+    LogEvent log = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message LogDBCompactedEvent {
+    LogEvent log = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message ConnectionEvent {
+    string address = 1;
+    bool snapshot = 2;
+}
+
+message ConnectionEstablishedEvent {
+    ConnectionEvent connection = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message ConnectionFailedEvent {
+    ConnectionEvent connection = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+enum EventType {
+    UNKNOWN = 0;
+    SNAPSHOT_RECEIVED = 1;
+    SNAPSHOT_RECOVERED = 2;
+    SNAPSHOT_CREATED = 3;
+    SNAPSHOT_COMPACTED = 4;
+    LOG_COMPACTED = 5;
+    LOGDB_COMPACTED = 6;
 }
