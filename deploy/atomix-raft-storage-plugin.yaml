@@ -355,6 +355,9 @@ spec:
                 type: integer
               index:
                 type: integer
+              lastUpdated:
+                type: string
+                format: date-time
               lastSnapshotIndex:
                 type: integer
               lastSnapshotTime:
@@ -408,7 +411,7 @@ spec:
     kind: MultiRaftProtocol
   drivers:
   - version: v2beta1
-    image: atomix/atomix-raft-storage-driver:latest
+    image: atomix/atomix-raft-storage-driver:v0.8.0
     config:
       group: storage.atomix.io
       kind: RaftSessionConfig
@@ -505,7 +508,7 @@ spec:
       serviceAccountName: atomix-raft-storage-controller
       containers:
       - name: controller
-        image: atomix/atomix-raft-storage-controller:latest
+        image: atomix/atomix-raft-storage-controller:v0.8.0
         imagePullPolicy: IfNotPresent
         readinessProbe:
           exec:
@@ -531,4 +534,4 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: DEFAULT_NODE_V2BETA1_IMAGE
-          value: atomix/atomix-raft-storage-node:latest
+          value: atomix/atomix-raft-storage-node:v0.8.0
