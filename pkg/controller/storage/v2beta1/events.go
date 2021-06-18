@@ -21,18 +21,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *Reconciler) recordPartitionReady(protocol *storagev2beta1.MultiRaftProtocol, clusterID int, podID int, event *storage.PartitionReadyEvent, timestamp metav1.Time) {
+func (r *Reconciler) recordPartitionReady(protocol *storagev2beta1.MultiRaftProtocol, clusterID int, podID int, event *storage.MemberReadyEvent, timestamp metav1.Time) {
 	pod, err := r.getPod(protocol, clusterID, podID)
 	if err != nil {
 		log.Error(err)
 	}
-	r.events.Eventf(pod, "Normal", "PartitionReady", "Partition %d is ready", event.Partition)
+	r.events.Eventf(pod, "Normal", "MemberReady", "Member is ready to receive requests on partition %d", event.Partition)
 
 	member, err := r.getMember(protocol, clusterID, int(event.Partition), podID)
 	if err != nil {
 		log.Error(err)
 	}
-	r.events.Eventf(member, "Normal", "Ready", "Member is ready")
+	r.events.Eventf(member, "Normal", "Ready", "Member is ready to receive requests")
 
 	err = backoff.Retry(func() error {
 		member, err := r.getMember(protocol, clusterID, int(event.Partition), podID)

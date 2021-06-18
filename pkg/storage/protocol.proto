@@ -41,7 +41,7 @@ message SubscribeRequest {
 message RaftEvent {
     google.protobuf.Timestamp timestamp = 1 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
     oneof event {
-        PartitionReadyEvent partition_ready = 2;
+        MemberReadyEvent member_ready = 2;
         LeaderUpdatedEvent leader_updated = 3;
         MembershipChangedEvent membership_changed = 4;
         SendSnapshotStartedEvent send_snapshot_started = 5;
@@ -62,7 +62,7 @@ message PartitionEvent {
     uint64 partition = 1;
 }
 
-message PartitionReadyEvent {
+message MemberReadyEvent {
     PartitionEvent partition = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
 }
 

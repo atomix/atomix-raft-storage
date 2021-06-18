@@ -221,8 +221,9 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 		startedPartitions := make(map[uint64]bool)
 		started := false
 		for event := range eventCh {
-			if ready, ok := event.Event.(*RaftEvent_PartitionReady); ok {
-				startedPartitions[ready.PartitionReady.Partition] = true
+			if leader, ok := event.Event.(*RaftEvent_LeaderUpdated); ok &&
+				leader.LeaderUpdated.Term > 0 && leader.LeaderUpdated.Leader != "" {
+				startedPartitions[leader.LeaderUpdated.Partition] = true
 				if !started && len(startedPartitions) == len(p.servers) {
 					close(startedCh)
 					started = true

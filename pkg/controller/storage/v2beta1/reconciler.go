@@ -64,6 +64,15 @@ func addRaftProtocolController(mgr manager.Manager) error {
 	if err != nil {
 		return err
 	}
+
+	// Watch for changes to secondary resource StatefulSet
+	err = controller.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
+		OwnerType:    &storagev2beta1.MultiRaftProtocol{},
+		IsController: true,
+	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -25,6 +25,7 @@ import (
 )
 
 func (r *Reconciler) reconcileStatus(protocol *storagev2beta1.MultiRaftProtocol) error {
+	state := storagev2beta1.MultiRaftProtocolReady
 	for _, clusterID := range getClusters(protocol) {
 		cluster, err := r.getCluster(protocol, clusterID)
 		if err != nil {
@@ -32,6 +33,9 @@ func (r *Reconciler) reconcileStatus(protocol *storagev2beta1.MultiRaftProtocol)
 		}
 		if err := r.reconcileClusterStatus(protocol, cluster); err != nil {
 			return err
+		}
+		if cluster.Status.State != storagev2beta1.RaftClusterReady {
+			state = storagev2beta1.MultiRaftProtocolNotReady
 		}
 	}
 
@@ -56,14 +60,6 @@ func (r *Reconciler) reconcileStatus(protocol *storagev2beta1.MultiRaftProtocol)
 			!isReplicasSame(protocol.Status.Replicas, replicas) ||
 			!isPartitionsSame(protocol.Status.Partitions, partitions) {
 			revision++
-		}
-
-		state := storagev2beta1.MultiRaftProtocolReady
-		for _, partition := range partitions {
-			if !partition.Ready {
-				state = storagev2beta1.MultiRaftProtocolNotReady
-				break
-			}
 		}
 
 		if state == storagev2beta1.MultiRaftProtocolReady && protocol.Status.State != storagev2beta1.MultiRaftProtocolReady {
@@ -122,7 +118,7 @@ func (r *Reconciler) reconcilePartitionStatus(protocol *storagev2beta1.MultiRaft
 		if err := r.reconcileMemberStatus(protocol, cluster, partition, member); err != nil {
 			return err
 		}
-		if member.Status.State == nil || *member.Status.State == storagev2beta1.RaftMemberNotReady {
+		if member.Status.State == nil || *member.Status.State != storagev2beta1.RaftMemberReady {
 			status.State = storagev2beta1.RaftPartitionNotReady
 		}
 		if member.Status.Term != nil && (status.Term == nil || *member.Status.Term > *status.Term) {
@@ -145,6 +141,22 @@ func (r *Reconciler) reconcilePartitionStatus(protocol *storagev2beta1.MultiRaft
 }
 
 func (r *Reconciler) reconcileMemberStatus(protocol *storagev2beta1.MultiRaftProtocol, cluster *storagev2beta1.RaftCluster, partition *storagev2beta1.RaftPartition, member *storagev2beta1.RaftMember) error {
+	ready, err := r.isReplicaReady(protocol, int(cluster.Spec.ClusterID), int(member.Spec.MemberID))
+	if err != nil {
+		return err
+	}
+
+	if ready && (member.Status.State == nil || *member.Status.State != storagev2beta1.RaftMemberReady) {
+		state := storagev2beta1.RaftMemberReady
+		return r.updateMemberStatus(member, storagev2beta1.RaftMemberStatus{
+			State: &state,
+		})
+	} else if !ready && (member.Status.State == nil || *member.Status.State != storagev2beta1.RaftMemberNotReady) {
+		state := storagev2beta1.RaftMemberNotReady
+		return r.updateMemberStatus(member, storagev2beta1.RaftMemberStatus{
+			State: &state,
+		})
+	}
 	return nil
 }
 
@@ -251,22 +263,21 @@ func (r *Reconciler) getProtocolReplicas(protocol *storagev2beta1.MultiRaftProto
 
 func (r *Reconciler) getProtocolPartitions(protocol *storagev2beta1.MultiRaftProtocol) ([]corev2beta1.PartitionStatus, error) {
 	partitions := make([]corev2beta1.PartitionStatus, 0, protocol.Spec.Partitions)
-
 	for _, clusterID := range getClusters(protocol) {
 		for _, partitionID := range getPartitions(protocol, clusterID) {
-			partitionName := types.NamespacedName{
-				Namespace: protocol.Namespace,
-				Name:      getPartitionName(protocol, clusterID, partitionID),
+			partitionReady := true
+			for replicaID := range getReplicas(protocol, clusterID) {
+				replicaReady, err := r.isReplicaReady(protocol, clusterID, replicaID)
+				if err != nil {
+					return nil, err
+				} else if !replicaReady {
+					partitionReady = false
+				}
 			}
-			partition := &storagev2beta1.RaftPartition{}
-			if err := r.client.Get(context.TODO(), partitionName, partition); err != nil {
-				return nil, err
-			}
-
 			partitions = append(partitions, corev2beta1.PartitionStatus{
 				ID:       uint32(partitionID),
 				Replicas: getReplicas(protocol, clusterID),
-				Ready:    partition.Status.State == storagev2beta1.RaftPartitionReady,
+				Ready:    partitionReady,
 			})
 		}
 	}

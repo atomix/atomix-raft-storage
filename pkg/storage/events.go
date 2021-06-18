@@ -89,8 +89,8 @@ func (e *raftEventListener) NodeUnloaded(info raftio.NodeInfo) {
 func (e *raftEventListener) NodeReady(info raftio.NodeInfo) {
 	e.publish(RaftEvent{
 		Timestamp: time.Now(),
-		Event: &RaftEvent_PartitionReady{
-			PartitionReady: &PartitionReadyEvent{
+		Event: &RaftEvent_MemberReady{
+			MemberReady: &MemberReadyEvent{
 				PartitionEvent: PartitionEvent{
 					Partition: info.ClusterID,
 				},

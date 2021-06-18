@@ -303,8 +303,8 @@ func (r *Reconciler) startMonitoringPod(protocol *storagev2beta1.MultiRaftProtoc
 
 			log.Infof("Received event %+v from %s", event, replicaID)
 			switch e := event.Event.(type) {
-			case *storage.RaftEvent_PartitionReady:
-				r.recordPartitionReady(protocol, int(cluster.Spec.ClusterID), podID, e.PartitionReady, metav1.NewTime(event.Timestamp))
+			case *storage.RaftEvent_MemberReady:
+				r.recordPartitionReady(protocol, int(cluster.Spec.ClusterID), podID, e.MemberReady, metav1.NewTime(event.Timestamp))
 			case *storage.RaftEvent_LeaderUpdated:
 				r.recordLeaderUpdated(protocol, int(cluster.Spec.ClusterID), podID, e.LeaderUpdated, metav1.NewTime(event.Timestamp))
 			case *storage.RaftEvent_MembershipChanged:
