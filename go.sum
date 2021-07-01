@@ -55,6 +55,8 @@ github.com/atomix/atomix-api/go v0.4.1 h1:x9Ko/m0wH2tCZcDwojBiSm033UEnPC7Dd5x75F
 github.com/atomix/atomix-api/go v0.4.1/go.mod h1:N6gtApjoC9bRS9m7dksdVQIWSKaNArAl5EiOoaTHnmw=
 github.com/atomix/atomix-api/go v0.4.5 h1:LRaDmYZ4j0aeTfKG+dRd+Uei0KmXQ8x+7a0Nv7WSd80=
 github.com/atomix/atomix-api/go v0.4.5/go.mod h1:N6gtApjoC9bRS9m7dksdVQIWSKaNArAl5EiOoaTHnmw=
+github.com/atomix/atomix-api/go v0.4.6 h1:xEoefto1bGD7vqwQlpTfDsmhR9vfFkvt66fPhiRzAuU=
+github.com/atomix/atomix-api/go v0.4.6/go.mod h1:N6gtApjoC9bRS9m7dksdVQIWSKaNArAl5EiOoaTHnmw=
 github.com/atomix/atomix-controller v0.5.0 h1:kEx0L2jUQV0Q115tZG8yNA9AYaob2UOw/SFV62mJ66g=
 github.com/atomix/atomix-controller v0.5.0/go.mod h1:hXqlnsSWxzzvkSIR/UBhvJxFdDNR0BZqvYTGQ4kON7c=
 github.com/atomix/atomix-go-framework v0.6.0 h1:fn40DgNTRHOmHWKV3o6Nal5gwMRHy7WEnonC+m7sLO8=

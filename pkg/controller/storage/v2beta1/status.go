@@ -249,7 +249,7 @@ func (r *Reconciler) getProtocolReplicas(protocol *storagev2beta1.MultiRaftProto
 			replica := corev2beta1.ReplicaStatus{
 				ID:   replicaName,
 				Host: pointer.StringPtr(getPodDNSName(protocol, clusterID, replicaID)),
-				Port: pointer.Int32Ptr(int32(apiPort)),
+				Port: pointer.Int32Ptr(apiPort),
 				ExtraPorts: map[string]int32{
 					protocolPortName: protocolPort,
 				},
@@ -277,6 +277,8 @@ func (r *Reconciler) getProtocolPartitions(protocol *storagev2beta1.MultiRaftPro
 			partitions = append(partitions, corev2beta1.PartitionStatus{
 				ID:       uint32(partitionID),
 				Replicas: getReplicas(protocol, clusterID),
+				Host:     pointer.StringPtr(getPartitionDNSName(protocol, clusterID, partitionID)),
+				Port:     pointer.Int32Ptr(apiPort),
 				Ready:    partitionReady,
 			})
 		}

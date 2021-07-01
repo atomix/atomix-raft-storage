@@ -18,17 +18,23 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	protocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/stream"
+	"github.com/atomix/atomix-raft-storage/pkg/storage/config"
 	"github.com/gogo/protobuf/proto"
 	"github.com/lni/dragonboat/v3/statemachine"
 	"io"
 	"sync"
+	"time"
 )
 
 // newStateMachine returns a new primitive state machine
-func newStateMachine(cluster cluster.Cluster, partitionID protocol.PartitionID, registry *protocol.Registry, streams *streamManager) *StateMachine {
+func newStateMachine(cluster cluster.Cluster, partitionID protocol.PartitionID, config config.ProtocolConfig, registry *protocol.Registry, streams *streamManager) *StateMachine {
+	sessionTimeout := time.Minute
+	if config.SessionTimeout != nil {
+		sessionTimeout = *config.SessionTimeout
+	}
 	return &StateMachine{
 		partition: partitionID,
-		state:     protocol.NewManager(cluster, registry),
+		state:     protocol.NewManager(cluster, registry, sessionTimeout),
 		streams:   streams,
 	}
 }

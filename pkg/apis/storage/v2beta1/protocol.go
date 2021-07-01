@@ -29,14 +29,14 @@ const (
 
 // MultiRaftProtocolSpec specifies a MultiRaftProtocol configuration
 type MultiRaftProtocolSpec struct {
-	// Clusters is the number of clusters to create
-	Clusters int32 `json:"clusters,omitempty"`
+	// Replicas is the number of raft replicas
+	Replicas int32 `json:"replicas,omitempty"`
 
 	// Partitions is the number of partitions
 	Partitions int32 `json:"partitions,omitempty"`
 
-	// Replicas is the number of raft replicas
-	Replicas int32 `json:"replicas,omitempty"`
+	// Quorum is the partition quorum size
+	Quorum int32 `json:"quorum,omitempty"`
 
 	// Image is the image to run
 	Image string `json:"image,omitempty"`
@@ -50,8 +50,42 @@ type MultiRaftProtocolSpec struct {
 	// SecurityContext is a pod security context
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
+	RaftConfig RaftProtocolConfig `json:"raftConfig,omitempty"`
+
 	// VolumeClaimTemplate is the volume claim template for Raft logs
 	VolumeClaimTemplate *corev1.PersistentVolumeClaim `json:"volumeClaimTemplate,omitempty"`
+}
+
+type RaftProtocolConfig struct {
+	HeartbeatPeriod    *metav1.Duration        `json:"heartbeatPeriod,omitempty"`
+	ElectionTimeout    *metav1.Duration        `json:"electionTimeout,omitempty"`
+	SessionTimeout     *metav1.Duration        `json:"sessionTimeout,omitempty"`
+	SnapshotStrategy   *RaftSnapshotStrategy   `json:"snapshotStrategy,omitempty"`
+	CompactionStrategy *RaftCompactionStrategy `json:"compactionStrategy,omitempty"`
+}
+
+type RaftSnapshotStrategyType string
+
+const (
+	RaftSnapshotNone      RaftSnapshotStrategyType = "None"
+	RaftSnapshotThreshold RaftSnapshotStrategyType = "Threshold"
+)
+
+type RaftSnapshotStrategy struct {
+	Type           RaftSnapshotStrategyType `json:"type,omitempty"`
+	EntryThreshold *int64                   `json:"entryThreshold,omitempty"`
+}
+
+type RaftCompactionStrategyType string
+
+const (
+	RaftCompactionNone RaftCompactionStrategyType = "None"
+	RaftCompactionAuto RaftCompactionStrategyType = "Auto"
+)
+
+type RaftCompactionStrategy struct {
+	Type          RaftCompactionStrategyType `json:"type,omitempty"`
+	RetainEntries *int64                     `json:"retainEntries,omitempty"`
 }
 
 // MultiRaftProtocolStatus defines the status of a MultiRaftProtocol
