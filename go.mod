@@ -6,7 +6,7 @@ require (
 	github.com/atomix/api v0.3.3
 	github.com/atomix/atomix-api/go v0.4.5
 	github.com/atomix/atomix-controller v0.5.0
-	github.com/atomix/atomix-go-framework v0.8.0
+	github.com/atomix/atomix-go-framework v0.8.1
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/gogo/protobuf v1.3.1
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
