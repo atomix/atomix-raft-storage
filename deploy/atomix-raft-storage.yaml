@@ -80,11 +80,153 @@ spec:
     listKind: MultiRaftProtocolList
     plural: multiraftprotocols
     singular: multiraftprotocol
+  scope: Namespaced
+  versions:
+  - name: v2beta1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    schema:
+      openAPIV3Schema:
+        type: object
+        required:
+        - spec
+        properties:
+          spec:
+            type: object
+            required:
+            - cluster
+            properties:
+              cluster:
+                type: object
+                properties:
+                  replicas:
+                    type: integer
+                    minimum: 1
+                    default: 1
+                  groups:
+                    type: integer
+                    minimum: 1
+                    maximum: 1024
+                    default: 1
+                  template:
+                    type: object
+                    required:
+                    - spec
+                    properties:
+                      spec:
+                        type: object
+                        properties:
+                          members:
+                            type: integer
+                            minimum: 1
+                          readOnlyMembers:
+                            type: integer
+                          image:
+                            type: string
+                          imagePullPolicy:
+                            type: string
+                          imagePullSecrets:
+                            type: array
+                            items:
+                              type: object
+                              required:
+                              - name
+                              properties:
+                                name:
+                                  type: string
+                          securityContext:
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
+                          volumeClaimTemplate:
+                            x-kubernetes-preserve-unknown-fields: true
+                            type: object
+                          raftConfig:
+                            type: object
+                            properties:
+                              heartbeatPeriod:
+                                type: string
+                              electionTimeout:
+                                type: string
+                              sessionTimeout:
+                                type: string
+                              snapshotStrategy:
+                                type: object
+                                properties:
+                                  type:
+                                    type: string
+                                  entryThreshold:
+                                    type: integer
+                              compactionStrategy:
+                                type: object
+                                properties:
+                                  type:
+                                    type: string
+                                  retainEntries:
+                                    type: integer
+          status:
+            type: object
+            properties:
+              revision:
+                type: integer
+              replicas:
+                type: array
+                items:
+                  type: object
+                  required:
+                  - id
+                  - host
+                  - port
+                  properties:
+                    id:
+                      type: string
+                    nodeId:
+                      type: string
+                    host:
+                      type: string
+                    port:
+                      type: integer
+                    extraPorts:
+                      type: object
+                      additionalProperties:
+                        type: integer
+                    ready:
+                      type: boolean
+              partitions:
+                type: array
+                items:
+                  type: object
+                  required:
+                  - id
+                  - replicas
+                  properties:
+                    id:
+                      type: integer
+                      minimum: 1
+                    replicas:
+                      type: array
+                      items:
+                        type: string
+                    ready:
+                      type: boolean
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: multiraftclusters.storage.atomix.io
+spec:
+  group: storage.atomix.io
+  names:
+    kind: MultiRaftCluster
+    listKind: MultiRaftClusterList
+    plural: multiraftclusters
+    singular: multiraftcluster
     shortNames:
     - multirafts
     - multiraft
-    - rafts
-    - raft
+    - raftclusters
+    - raftcluster
   scope: Namespaced
   versions:
   - name: v2beta1
@@ -105,12 +247,109 @@ spec:
                 type: integer
                 minimum: 1
                 default: 1
-              partitions:
+              groups:
                 type: integer
                 minimum: 1
                 maximum: 1024
                 default: 1
-              quorum:
+              template:
+                type: object
+                required:
+                - spec
+                properties:
+                  spec:
+                    type: object
+                    properties:
+                      members:
+                        type: integer
+                        minimum: 1
+                      readOnlyMembers:
+                        type: integer
+                      image:
+                        type: string
+                      imagePullPolicy:
+                        type: string
+                      imagePullSecrets:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                          - name
+                          properties:
+                            name:
+                              type: string
+                      securityContext:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                      volumeClaimTemplate:
+                        x-kubernetes-preserve-unknown-fields: true
+                        type: object
+                      raftConfig:
+                        type: object
+                        properties:
+                          heartbeatPeriod:
+                            type: string
+                          electionTimeout:
+                            type: string
+                          sessionTimeout:
+                            type: string
+                          snapshotStrategy:
+                            type: object
+                            properties:
+                              type:
+                                type: string
+                              entryThreshold:
+                                type: integer
+                          compactionStrategy:
+                            type: object
+                            properties:
+                              type:
+                                type: string
+                              retainEntries:
+                                type: integer
+          status:
+            type: object
+            properties:
+              state:
+                type: string
+                default: NotReady
+    additionalPrinterColumns:
+    - name: Status
+      type: string
+      description: The Raft cluster state
+      jsonPath: .status.state
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: raftgroups.storage.atomix.io
+spec:
+  group: storage.atomix.io
+  names:
+    kind: RaftGroup
+    listKind: RaftGroupList
+    plural: raftgroups
+    singular: raftgroup
+  scope: Namespaced
+  versions:
+  - name: v2beta1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    schema:
+      openAPIV3Schema:
+        type: object
+        required:
+        - spec
+        properties:
+          spec:
+            type: object
+            properties:
+              members:
+                type: integer
+                minimum: 1
+              readOnlyMembers:
                 type: integer
               image:
                 type: string
@@ -160,154 +399,11 @@ spec:
               state:
                 type: string
                 default: NotReady
-              revision:
-                type: integer
-              replicas:
-                type: array
-                items:
-                  type: object
-                  required:
-                  - id
-                  - host
-                  - port
-                  properties:
-                    id:
-                      type: string
-                    nodeId:
-                      type: string
-                    host:
-                      type: string
-                    port:
-                      type: integer
-                    extraPorts:
-                      type: object
-                      additionalProperties:
-                        type: integer
-                    ready:
-                      type: boolean
-              partitions:
-                type: array
-                items:
-                  type: object
-                  required:
-                  - id
-                  - replicas
-                  properties:
-                    id:
-                      type: integer
-                      minimum: 1
-                    replicas:
-                      type: array
-                      items:
-                        type: string
-                    ready:
-                      type: boolean
-    additionalPrinterColumns:
-    - name: Status
-      type: string
-      description: The protocol state
-      jsonPath: .status.state
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: raftclusters.storage.atomix.io
-spec:
-  group: storage.atomix.io
-  names:
-    kind: RaftCluster
-    listKind: RaftClusterList
-    plural: raftclusters
-    singular: raftcluster
-  scope: Namespaced
-  versions:
-  - name: v2beta1
-    served: true
-    storage: true
-    subresources:
-      status: {}
-    schema:
-      openAPIV3Schema:
-        type: object
-        required:
-        - spec
-        properties:
-          spec:
-            type: object
-            required:
-            - clusterId
-            properties:
-              clusterId:
-                type: integer
-          status:
-            type: object
-            properties:
-              state:
-                type: string
-                default: NotReady
-    additionalPrinterColumns:
-    - name: ID
-      type: integer
-      description: The cluster ID
-      jsonPath: .spec.clusterId
-    - name: Status
-      type: string
-      description: The cluster state
-      jsonPath: .status.state
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: raftpartitions.storage.atomix.io
-spec:
-  group: storage.atomix.io
-  names:
-    kind: RaftPartition
-    listKind: RaftPartitionList
-    plural: raftpartitions
-    singular: raftpartition
-  scope: Namespaced
-  versions:
-  - name: v2beta1
-    served: true
-    storage: true
-    subresources:
-      status: {}
-    schema:
-      openAPIV3Schema:
-        type: object
-        required:
-        - spec
-        properties:
-          spec:
-            type: object
-            required:
-            - clusterId
-            - partitionId
-            properties:
-              clusterId:
-                type: integer
-              partitionId:
-                type: integer
-          status:
-            type: object
-            properties:
-              state:
-                type: string
-                default: NotReady
               leader:
                 type: string
               term:
                 type: integer
     additionalPrinterColumns:
-    - name: ID
-      type: integer
-      description: The partition ID
-      jsonPath: .spec.partitionId
-    - name: Cluster
-      type: integer
-      description: The cluster to which the partition belongs
-      jsonPath: .spec.clusterId
     - name: Leader
       type: string
       description: The current leader for the partition
@@ -347,19 +443,9 @@ spec:
         properties:
           spec:
             type: object
-            required:
-            - clusterId
-            - partitionId
-            - pod
             properties:
-              clusterId:
-                type: integer
-              partitionId:
-                type: integer
-              memberId:
-                type: integer
-              pod:
-                type: string
+              readOnly:
+                type: boolean
           status:
             type: object
             properties:
@@ -383,18 +469,6 @@ spec:
                 type: string
                 format: date-time
     additionalPrinterColumns:
-    - name: Pod
-      type: string
-      description: The pod to which the member belongs
-      jsonPath: .spec.pod
-    - name: Partition
-      type: integer
-      description: The partition to which the member belongs
-      jsonPath: .spec.partitionId
-    - name: Cluster
-      type: integer
-      description: The cluster to which the member belongs
-      jsonPath: .spec.clusterId
     - name: Role
       type: string
       description: The member role

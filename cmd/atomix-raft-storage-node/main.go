@@ -38,6 +38,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"syscall"
 )
 
 const monitoringPort = 5000
@@ -86,8 +87,8 @@ func main() {
 	}
 
 	// Wait for an interrupt signal
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, os.Interrupt)
+	ch := make(chan os.Signal, 2)
+	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
 	<-ch
 
 	// Stop the node after an interrupt

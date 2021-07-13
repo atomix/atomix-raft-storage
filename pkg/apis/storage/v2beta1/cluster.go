@@ -18,46 +18,55 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type RaftClusterState string
+type MultiRaftClusterState string
 
 const (
-	RaftClusterNotReady RaftClusterState = "NotReady"
-	RaftClusterReady    RaftClusterState = "Ready"
+	MultiRaftClusterNotReady MultiRaftClusterState = "NotReady"
+	MultiRaftClusterReady    MultiRaftClusterState = "Ready"
 )
 
-// RaftClusterSpec specifies a RaftClusterSpec configuration
-type RaftClusterSpec struct {
-	ClusterID int32 `json:"clusterId,omitempty"`
+// MultiRaftClusterSpec specifies a MultiRaftClusterSpec configuration
+type MultiRaftClusterSpec struct {
+	// Replicas is the number of raft replicas
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// Groups is the number of groups
+	Groups int32 `json:"partitions,omitempty"`
+	GroupTemplate RaftGroupTemplateSpec `json:"groupTemplate,omitempty"`
 }
 
-// RaftClusterStatus defines the status of a RaftCluster
-type RaftClusterStatus struct {
-	State RaftClusterState `json:"state,omitempty"`
+type RaftGroupTemplateSpec struct {
+	Spec RaftGroupSpec `json:"spec,omitempty"`
+}
+
+// MultiRaftClusterStatus defines the status of a RaftCluster
+type MultiRaftClusterStatus struct {
+	State MultiRaftClusterState `json:"state,omitempty"`
 }
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// RaftCluster is the Schema for the RaftCluster API
+// MultiRaftCluster is the Schema for the RaftCluster API
 // +k8s:openapi-gen=true
-type RaftCluster struct {
+type MultiRaftCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              RaftClusterSpec   `json:"spec,omitempty"`
-	Status            RaftClusterStatus `json:"status,omitempty"`
+	Spec              MultiRaftClusterSpec   `json:"spec,omitempty"`
+	Status            MultiRaftClusterStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// RaftClusterList contains a list of RaftCluster
-type RaftClusterList struct {
+// MultiRaftClusterList contains a list of MultiRaftCluster
+type MultiRaftClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the RaftCluster of items in the list
-	Items []RaftCluster `json:"items"`
+	Items []MultiRaftCluster `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&RaftCluster{}, &RaftClusterList{})
+	SchemeBuilder.Register(&MultiRaftCluster{}, &MultiRaftClusterList{})
 }

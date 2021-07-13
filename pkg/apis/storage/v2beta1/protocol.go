@@ -16,7 +16,6 @@ package v2beta1
 
 import (
 	"github.com/atomix/atomix-controller/pkg/apis/core/v2beta1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,63 +28,7 @@ const (
 
 // MultiRaftProtocolSpec specifies a MultiRaftProtocol configuration
 type MultiRaftProtocolSpec struct {
-	// Replicas is the number of raft replicas
-	Replicas int32 `json:"replicas,omitempty"`
-
-	// Partitions is the number of partitions
-	Partitions int32 `json:"partitions,omitempty"`
-
-	// Quorum is the partition quorum size
-	Quorum int32 `json:"quorum,omitempty"`
-
-	// Image is the image to run
-	Image string `json:"image,omitempty"`
-
-	// ImagePullPolicy is the pull policy to apply
-	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
-
-	// ImagePullSecrets is a list of secrets for pulling images
-	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
-
-	// SecurityContext is a pod security context
-	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
-
-	RaftConfig RaftProtocolConfig `json:"raftConfig,omitempty"`
-
-	// VolumeClaimTemplate is the volume claim template for Raft logs
-	VolumeClaimTemplate *corev1.PersistentVolumeClaim `json:"volumeClaimTemplate,omitempty"`
-}
-
-type RaftProtocolConfig struct {
-	HeartbeatPeriod    *metav1.Duration        `json:"heartbeatPeriod,omitempty"`
-	ElectionTimeout    *metav1.Duration        `json:"electionTimeout,omitempty"`
-	SessionTimeout     *metav1.Duration        `json:"sessionTimeout,omitempty"`
-	SnapshotStrategy   *RaftSnapshotStrategy   `json:"snapshotStrategy,omitempty"`
-	CompactionStrategy *RaftCompactionStrategy `json:"compactionStrategy,omitempty"`
-}
-
-type RaftSnapshotStrategyType string
-
-const (
-	RaftSnapshotNone      RaftSnapshotStrategyType = "None"
-	RaftSnapshotThreshold RaftSnapshotStrategyType = "Threshold"
-)
-
-type RaftSnapshotStrategy struct {
-	Type           RaftSnapshotStrategyType `json:"type,omitempty"`
-	EntryThreshold *int64                   `json:"entryThreshold,omitempty"`
-}
-
-type RaftCompactionStrategyType string
-
-const (
-	RaftCompactionNone RaftCompactionStrategyType = "None"
-	RaftCompactionAuto RaftCompactionStrategyType = "Auto"
-)
-
-type RaftCompactionStrategy struct {
-	Type          RaftCompactionStrategyType `json:"type,omitempty"`
-	RetainEntries *int64                     `json:"retainEntries,omitempty"`
+	Cluster MultiRaftClusterSpec `json:"cluster,omitempty"`
 }
 
 // MultiRaftProtocolStatus defines the status of a MultiRaftProtocol

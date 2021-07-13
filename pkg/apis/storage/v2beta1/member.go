@@ -35,10 +35,7 @@ const (
 
 // RaftMemberSpec specifies a RaftMemberSpec configuration
 type RaftMemberSpec struct {
-	ClusterID   int32  `json:"clusterId,omitempty"`
-	PartitionID int32  `json:"partitionId,omitempty"`
-	MemberID    int32  `json:"memberId,omitempty"`
-	Pod         string `json:"pod,omitempty"`
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // RaftMemberStatus defines the status of a RaftMember
