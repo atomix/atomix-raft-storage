@@ -37,10 +37,11 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 func main() {
-	logging.SetLevel(logging.DebugLevel)
+	logging.SetLevel(logging.InfoLevel)
 
 	address := os.Args[1]
 	parts := strings.Split(address, ":")
@@ -82,8 +83,8 @@ func main() {
 	}
 
 	// Wait for an interrupt signal
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, os.Interrupt)
+	ch := make(chan os.Signal, 2)
+	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
 	<-ch
 
 	// Stop the node after an interrupt
