@@ -411,7 +411,7 @@ spec:
     kind: MultiRaftProtocol
   drivers:
   - version: v2beta1
-    image: atomix/atomix-raft-storage-driver:v0.8.0
+    image: atomix/atomix-raft-storage-driver:v0.8.3
     config:
       group: storage.atomix.io
       kind: RaftSessionConfig
@@ -508,7 +508,7 @@ spec:
       serviceAccountName: atomix-raft-storage-controller
       containers:
       - name: controller
-        image: atomix/atomix-raft-storage-controller:v0.8.0
+        image: atomix/atomix-raft-storage-controller:v0.8.3
         imagePullPolicy: IfNotPresent
         readinessProbe:
           exec:
@@ -534,4 +534,4 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
         - name: DEFAULT_NODE_V2BETA1_IMAGE
-          value: atomix/atomix-raft-storage-node:v0.8.0
+          value: atomix/atomix-raft-storage-node:v0.8.3
