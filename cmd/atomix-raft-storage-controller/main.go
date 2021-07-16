@@ -23,8 +23,6 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	storagev2beta1 "github.com/atomix/atomix-raft-storage/pkg/controller/storage/v2beta1"
 
-	storagev1beta1 "github.com/atomix/atomix-raft-storage/pkg/controller/storage/v1beta1"
-
 	"os"
 	"runtime"
 
@@ -99,12 +97,6 @@ func main() {
 
 	// Setup Scheme for storage resources
 	if err := core.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "")
-		os.Exit(1)
-	}
-
-	// Add the storage/v1beta1 controllers
-	if err := storagev1beta1.AddControllers(mgr); err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}
