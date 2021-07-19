@@ -27,11 +27,37 @@ var _ = time.Kitchen
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
+type NodeType int32
+
+const (
+	NodeType_MEMBER   NodeType = 0
+	NodeType_OBSERVER NodeType = 1
+)
+
+var NodeType_name = map[int32]string{
+	0: "MEMBER",
+	1: "OBSERVER",
+}
+
+var NodeType_value = map[string]int32{
+	"MEMBER":   0,
+	"OBSERVER": 1,
+}
+
+func (x NodeType) String() string {
+	return proto.EnumName(NodeType_name, int32(x))
+}
+
+func (NodeType) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_ac523a84bbf07b3d, []int{0}
+}
+
 type ProtocolConfig struct {
-	ElectionTimeout   *time.Duration `protobuf:"bytes,1,opt,name=election_timeout,json=electionTimeout,proto3,stdduration" json:"election_timeout,omitempty"`
-	HeartbeatInterval *time.Duration `protobuf:"bytes,2,opt,name=heartbeat_interval,json=heartbeatInterval,proto3,stdduration" json:"heartbeat_interval,omitempty"`
-	SnapshotInterval  *time.Duration `protobuf:"bytes,3,opt,name=snapshot_interval,json=snapshotInterval,proto3,stdduration" json:"snapshot_interval,omitempty"`
-	SnapshotThreshold uint64         `protobuf:"varint,4,opt,name=snapshot_threshold,json=snapshotThreshold,proto3" json:"snapshot_threshold,omitempty"`
+	SessionTimeout          *time.Duration `protobuf:"bytes,1,opt,name=session_timeout,json=sessionTimeout,proto3,stdduration" json:"session_timeout,omitempty"`
+	HeartbeatPeriod         *time.Duration `protobuf:"bytes,2,opt,name=heartbeat_period,json=heartbeatPeriod,proto3,stdduration" json:"heartbeat_period,omitempty"`
+	ElectionTimeout         *time.Duration `protobuf:"bytes,3,opt,name=election_timeout,json=electionTimeout,proto3,stdduration" json:"election_timeout,omitempty"`
+	SnapshotEntryThreshold  uint64         `protobuf:"varint,4,opt,name=snapshot_entry_threshold,json=snapshotEntryThreshold,proto3" json:"snapshot_entry_threshold,omitempty"`
+	CompactionRetainEntries uint64         `protobuf:"varint,5,opt,name=compaction_retain_entries,json=compactionRetainEntries,proto3" json:"compaction_retain_entries,omitempty"`
 }
 
 func (m *ProtocolConfig) Reset()         { *m = ProtocolConfig{} }
@@ -67,6 +93,20 @@ func (m *ProtocolConfig) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ProtocolConfig proto.InternalMessageInfo
 
+func (m *ProtocolConfig) GetSessionTimeout() *time.Duration {
+	if m != nil {
+		return m.SessionTimeout
+	}
+	return nil
+}
+
+func (m *ProtocolConfig) GetHeartbeatPeriod() *time.Duration {
+	if m != nil {
+		return m.HeartbeatPeriod
+	}
+	return nil
+}
+
 func (m *ProtocolConfig) GetElectionTimeout() *time.Duration {
 	if m != nil {
 		return m.ElectionTimeout
@@ -74,53 +114,52 @@ func (m *ProtocolConfig) GetElectionTimeout() *time.Duration {
 	return nil
 }
 
-func (m *ProtocolConfig) GetHeartbeatInterval() *time.Duration {
+func (m *ProtocolConfig) GetSnapshotEntryThreshold() uint64 {
 	if m != nil {
-		return m.HeartbeatInterval
+		return m.SnapshotEntryThreshold
 	}
-	return nil
+	return 0
 }
 
-func (m *ProtocolConfig) GetSnapshotInterval() *time.Duration {
+func (m *ProtocolConfig) GetCompactionRetainEntries() uint64 {
 	if m != nil {
-		return m.SnapshotInterval
-	}
-	return nil
-}
-
-func (m *ProtocolConfig) GetSnapshotThreshold() uint64 {
-	if m != nil {
-		return m.SnapshotThreshold
+		return m.CompactionRetainEntries
 	}
 	return 0
 }
 
 func init() {
+	proto.RegisterEnum("atomix.raft.config.NodeType", NodeType_name, NodeType_value)
 	proto.RegisterType((*ProtocolConfig)(nil), "atomix.raft.config.ProtocolConfig")
 }
 
 func init() { proto.RegisterFile("storage/config/config.proto", fileDescriptor_ac523a84bbf07b3d) }
 
 var fileDescriptor_ac523a84bbf07b3d = []byte{
-	// 288 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x8d, 0x31, 0x4e, 0xc3, 0x30,
-	0x14, 0x86, 0xeb, 0x12, 0x31, 0x18, 0x09, 0x5a, 0x8b, 0x21, 0x14, 0xc9, 0x54, 0x88, 0xa1, 0x0b,
-	0x8e, 0x04, 0x37, 0x28, 0x2c, 0x20, 0x84, 0x50, 0xd5, 0xbd, 0x72, 0x52, 0xc7, 0x89, 0x94, 0xe6,
-	0x55, 0xce, 0x0b, 0xe2, 0x18, 0x8c, 0x1c, 0x01, 0x6e, 0xc0, 0x11, 0x18, 0x3b, 0xb2, 0x01, 0xc9,
-	0x25, 0x18, 0x51, 0xe2, 0x24, 0x62, 0xec, 0x94, 0x5f, 0x79, 0xfe, 0xbe, 0x8f, 0x1e, 0x67, 0x08,
-	0x46, 0x6a, 0xe5, 0x05, 0x90, 0x86, 0xb1, 0x6e, 0x3e, 0x62, 0x6d, 0x00, 0x81, 0x31, 0x89, 0xb0,
-	0x8a, 0x9f, 0x84, 0x91, 0x21, 0x0a, 0x7b, 0x19, 0x71, 0x0d, 0xa0, 0x13, 0xe5, 0xd5, 0x2f, 0xfc,
-	0x3c, 0xf4, 0x96, 0xb9, 0x91, 0x18, 0x43, 0x6a, 0x99, 0xd1, 0xa1, 0x06, 0x0d, 0xf5, 0xf4, 0xaa,
-	0x65, 0xff, 0x9e, 0xbe, 0xf5, 0xe9, 0xfe, 0x43, 0xb5, 0x02, 0x48, 0xae, 0x6a, 0x11, 0xbb, 0xa5,
-	0x03, 0x95, 0xa8, 0xa0, 0x42, 0x17, 0x18, 0xaf, 0x14, 0xe4, 0xe8, 0x92, 0x31, 0x99, 0xec, 0x5d,
-	0x1c, 0x09, 0xdb, 0x10, 0x6d, 0x43, 0x5c, 0x37, 0x8d, 0xa9, 0xf3, 0xf2, 0x75, 0x42, 0x66, 0x07,
-	0x2d, 0x38, 0xb7, 0x1c, 0xbb, 0xa7, 0x2c, 0x52, 0xd2, 0xa0, 0xaf, 0x24, 0x2e, 0xe2, 0x14, 0x95,
-	0x79, 0x94, 0x89, 0xdb, 0xdf, 0xce, 0x36, 0xec, 0xd0, 0x9b, 0x86, 0x64, 0x77, 0x74, 0x98, 0xa5,
-	0x72, 0x9d, 0x45, 0xf0, 0x4f, 0xb7, 0xb3, 0x9d, 0x6e, 0xd0, 0x92, 0x9d, 0xed, 0x9c, 0xb2, 0xce,
-	0x86, 0x91, 0x51, 0x59, 0x04, 0xc9, 0xd2, 0x75, 0xc6, 0x64, 0xe2, 0xcc, 0xba, 0xce, 0xbc, 0x3d,
-	0x4c, 0xcf, 0x7e, 0x7f, 0x38, 0x79, 0x2d, 0x38, 0x79, 0x2f, 0x38, 0xf9, 0x28, 0x38, 0xd9, 0x14,
-	0x9c, 0x7c, 0x17, 0x9c, 0x3c, 0x97, 0xbc, 0xb7, 0x29, 0x79, 0xef, 0xb3, 0xe4, 0x3d, 0x7f, 0xb7,
-	0xee, 0x5f, 0xfe, 0x05, 0x00, 0x00, 0xff, 0xff, 0x4c, 0x3f, 0xb7, 0x72, 0xc1, 0x01, 0x00, 0x00,
+	// 367 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x8f, 0xb1, 0x6a, 0xdb, 0x40,
+	0x18, 0xc7, 0x75, 0xae, 0x6b, 0xcc, 0xb5, 0xd8, 0x46, 0x94, 0x56, 0x76, 0xe1, 0x6a, 0x8a, 0x07,
+	0xd3, 0x41, 0x82, 0x76, 0x29, 0x19, 0x95, 0x08, 0x42, 0xc0, 0x89, 0x51, 0x4c, 0x56, 0x71, 0x96,
+	0xce, 0xd2, 0x81, 0xac, 0x4f, 0xdc, 0x9d, 0x21, 0x7e, 0x8b, 0x8c, 0x79, 0x84, 0x3c, 0x42, 0x1e,
+	0x21, 0xa3, 0xc7, 0x6c, 0x49, 0xe4, 0x25, 0x8f, 0x90, 0x31, 0xe8, 0x64, 0x25, 0x19, 0x3d, 0xe9,
+	0x43, 0xbf, 0xef, 0xf7, 0xff, 0xfe, 0x87, 0x7f, 0x4a, 0x05, 0x82, 0xc6, 0xcc, 0x09, 0x21, 0x5b,
+	0xf0, 0x78, 0xf7, 0xb1, 0x73, 0x01, 0x0a, 0x4c, 0x93, 0x2a, 0x58, 0xf2, 0x4b, 0x5b, 0xd0, 0x85,
+	0xb2, 0x2b, 0x32, 0x20, 0x31, 0x40, 0x9c, 0x32, 0x47, 0x6f, 0xcc, 0x57, 0x0b, 0x27, 0x5a, 0x09,
+	0xaa, 0x38, 0x64, 0x95, 0x33, 0xf8, 0x16, 0x43, 0x0c, 0x7a, 0x74, 0xca, 0xa9, 0xfa, 0xfb, 0xfb,
+	0xb9, 0x81, 0x3b, 0xd3, 0x72, 0x0a, 0x21, 0x3d, 0xd4, 0x41, 0xe6, 0x31, 0xee, 0x4a, 0x26, 0x25,
+	0x87, 0x2c, 0x50, 0x7c, 0xc9, 0x60, 0xa5, 0x2c, 0x34, 0x44, 0xe3, 0x2f, 0x7f, 0xfb, 0x76, 0x75,
+	0xc2, 0xae, 0x4f, 0xd8, 0x47, 0xbb, 0x13, 0x6e, 0xf3, 0xfa, 0xe1, 0x17, 0xf2, 0x3b, 0x3b, 0x6f,
+	0x56, 0x69, 0xe6, 0x09, 0xee, 0x25, 0x8c, 0x0a, 0x35, 0x67, 0x54, 0x05, 0x39, 0x13, 0x1c, 0x22,
+	0xab, 0xb1, 0x5f, 0x54, 0xf7, 0x4d, 0x9c, 0x6a, 0xaf, 0xcc, 0x62, 0x29, 0x0b, 0xd5, 0xc7, 0x5a,
+	0x9f, 0xf6, 0xcc, 0xaa, 0xc5, 0xba, 0xd7, 0x7f, 0x6c, 0xc9, 0x8c, 0xe6, 0x32, 0x01, 0x15, 0xb0,
+	0x4c, 0x89, 0x75, 0xa0, 0x12, 0xc1, 0x64, 0x02, 0x69, 0x64, 0x35, 0x87, 0x68, 0xdc, 0xf4, 0xbf,
+	0xd7, 0xdc, 0x2b, 0xf1, 0xac, 0xa6, 0xe6, 0x01, 0xee, 0x87, 0xb0, 0xcc, 0x69, 0xd5, 0x43, 0x30,
+	0x45, 0x79, 0xa6, 0x23, 0x38, 0x93, 0xd6, 0x67, 0xad, 0xfe, 0x78, 0x5f, 0xf0, 0x35, 0xf7, 0x2a,
+	0xfc, 0x67, 0x84, 0xdb, 0xa7, 0x10, 0xb1, 0xd9, 0x3a, 0x67, 0x26, 0xc6, 0xad, 0x89, 0x37, 0x71,
+	0x3d, 0xbf, 0x67, 0x98, 0x5f, 0x71, 0xfb, 0xcc, 0x3d, 0xf7, 0xfc, 0x0b, 0xcf, 0xef, 0x21, 0x77,
+	0xf4, 0xf2, 0x44, 0xd0, 0x4d, 0x41, 0xd0, 0x6d, 0x41, 0xd0, 0x5d, 0x41, 0xd0, 0xa6, 0x20, 0xe8,
+	0xb1, 0x20, 0xe8, 0x6a, 0x4b, 0x8c, 0xcd, 0x96, 0x18, 0xf7, 0x5b, 0x62, 0xcc, 0x5b, 0xfa, 0xad,
+	0xff, 0x5e, 0x03, 0x00, 0x00, 0xff, 0xff, 0x4d, 0x22, 0x7f, 0x9e, 0x26, 0x02, 0x00, 0x00,
 }
 
 func (this *ProtocolConfig) Equal(that interface{}) bool {
@@ -142,6 +181,24 @@ func (this *ProtocolConfig) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
+	if this.SessionTimeout != nil && that1.SessionTimeout != nil {
+		if *this.SessionTimeout != *that1.SessionTimeout {
+			return false
+		}
+	} else if this.SessionTimeout != nil {
+		return false
+	} else if that1.SessionTimeout != nil {
+		return false
+	}
+	if this.HeartbeatPeriod != nil && that1.HeartbeatPeriod != nil {
+		if *this.HeartbeatPeriod != *that1.HeartbeatPeriod {
+			return false
+		}
+	} else if this.HeartbeatPeriod != nil {
+		return false
+	} else if that1.HeartbeatPeriod != nil {
+		return false
+	}
 	if this.ElectionTimeout != nil && that1.ElectionTimeout != nil {
 		if *this.ElectionTimeout != *that1.ElectionTimeout {
 			return false
@@ -151,25 +208,10 @@ func (this *ProtocolConfig) Equal(that interface{}) bool {
 	} else if that1.ElectionTimeout != nil {
 		return false
 	}
-	if this.HeartbeatInterval != nil && that1.HeartbeatInterval != nil {
-		if *this.HeartbeatInterval != *that1.HeartbeatInterval {
-			return false
-		}
-	} else if this.HeartbeatInterval != nil {
-		return false
-	} else if that1.HeartbeatInterval != nil {
+	if this.SnapshotEntryThreshold != that1.SnapshotEntryThreshold {
 		return false
 	}
-	if this.SnapshotInterval != nil && that1.SnapshotInterval != nil {
-		if *this.SnapshotInterval != *that1.SnapshotInterval {
-			return false
-		}
-	} else if this.SnapshotInterval != nil {
-		return false
-	} else if that1.SnapshotInterval != nil {
-		return false
-	}
-	if this.SnapshotThreshold != that1.SnapshotThreshold {
+	if this.CompactionRetainEntries != that1.CompactionRetainEntries {
 		return false
 	}
 	return true
@@ -194,13 +236,18 @@ func (m *ProtocolConfig) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.SnapshotThreshold != 0 {
-		i = encodeVarintConfig(dAtA, i, uint64(m.SnapshotThreshold))
+	if m.CompactionRetainEntries != 0 {
+		i = encodeVarintConfig(dAtA, i, uint64(m.CompactionRetainEntries))
+		i--
+		dAtA[i] = 0x28
+	}
+	if m.SnapshotEntryThreshold != 0 {
+		i = encodeVarintConfig(dAtA, i, uint64(m.SnapshotEntryThreshold))
 		i--
 		dAtA[i] = 0x20
 	}
-	if m.SnapshotInterval != nil {
-		n1, err1 := github_com_gogo_protobuf_types.StdDurationMarshalTo(*m.SnapshotInterval, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdDuration(*m.SnapshotInterval):])
+	if m.ElectionTimeout != nil {
+		n1, err1 := github_com_gogo_protobuf_types.StdDurationMarshalTo(*m.ElectionTimeout, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdDuration(*m.ElectionTimeout):])
 		if err1 != nil {
 			return 0, err1
 		}
@@ -209,8 +256,8 @@ func (m *ProtocolConfig) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x1a
 	}
-	if m.HeartbeatInterval != nil {
-		n2, err2 := github_com_gogo_protobuf_types.StdDurationMarshalTo(*m.HeartbeatInterval, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdDuration(*m.HeartbeatInterval):])
+	if m.HeartbeatPeriod != nil {
+		n2, err2 := github_com_gogo_protobuf_types.StdDurationMarshalTo(*m.HeartbeatPeriod, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdDuration(*m.HeartbeatPeriod):])
 		if err2 != nil {
 			return 0, err2
 		}
@@ -219,8 +266,8 @@ func (m *ProtocolConfig) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x12
 	}
-	if m.ElectionTimeout != nil {
-		n3, err3 := github_com_gogo_protobuf_types.StdDurationMarshalTo(*m.ElectionTimeout, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdDuration(*m.ElectionTimeout):])
+	if m.SessionTimeout != nil {
+		n3, err3 := github_com_gogo_protobuf_types.StdDurationMarshalTo(*m.SessionTimeout, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdDuration(*m.SessionTimeout):])
 		if err3 != nil {
 			return 0, err3
 		}
@@ -246,15 +293,16 @@ func encodeVarintConfig(dAtA []byte, offset int, v uint64) int {
 func NewPopulatedProtocolConfig(r randyConfig, easy bool) *ProtocolConfig {
 	this := &ProtocolConfig{}
 	if r.Intn(5) != 0 {
+		this.SessionTimeout = github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
+	}
+	if r.Intn(5) != 0 {
+		this.HeartbeatPeriod = github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
+	}
+	if r.Intn(5) != 0 {
 		this.ElectionTimeout = github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
 	}
-	if r.Intn(5) != 0 {
-		this.HeartbeatInterval = github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
-	}
-	if r.Intn(5) != 0 {
-		this.SnapshotInterval = github_com_gogo_protobuf_types.NewPopulatedStdDuration(r, easy)
-	}
-	this.SnapshotThreshold = uint64(uint64(r.Uint32()))
+	this.SnapshotEntryThreshold = uint64(uint64(r.Uint32()))
+	this.CompactionRetainEntries = uint64(uint64(r.Uint32()))
 	if !easy && r.Intn(10) != 0 {
 	}
 	return this
@@ -338,20 +386,23 @@ func (m *ProtocolConfig) Size() (n int) {
 	}
 	var l int
 	_ = l
+	if m.SessionTimeout != nil {
+		l = github_com_gogo_protobuf_types.SizeOfStdDuration(*m.SessionTimeout)
+		n += 1 + l + sovConfig(uint64(l))
+	}
+	if m.HeartbeatPeriod != nil {
+		l = github_com_gogo_protobuf_types.SizeOfStdDuration(*m.HeartbeatPeriod)
+		n += 1 + l + sovConfig(uint64(l))
+	}
 	if m.ElectionTimeout != nil {
 		l = github_com_gogo_protobuf_types.SizeOfStdDuration(*m.ElectionTimeout)
 		n += 1 + l + sovConfig(uint64(l))
 	}
-	if m.HeartbeatInterval != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdDuration(*m.HeartbeatInterval)
-		n += 1 + l + sovConfig(uint64(l))
+	if m.SnapshotEntryThreshold != 0 {
+		n += 1 + sovConfig(uint64(m.SnapshotEntryThreshold))
 	}
-	if m.SnapshotInterval != nil {
-		l = github_com_gogo_protobuf_types.SizeOfStdDuration(*m.SnapshotInterval)
-		n += 1 + l + sovConfig(uint64(l))
-	}
-	if m.SnapshotThreshold != 0 {
-		n += 1 + sovConfig(uint64(m.SnapshotThreshold))
+	if m.CompactionRetainEntries != 0 {
+		n += 1 + sovConfig(uint64(m.CompactionRetainEntries))
 	}
 	return n
 }
@@ -393,6 +444,78 @@ func (m *ProtocolConfig) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SessionTimeout", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowConfig
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthConfig
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthConfig
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SessionTimeout == nil {
+				m.SessionTimeout = new(time.Duration)
+			}
+			if err := github_com_gogo_protobuf_types.StdDurationUnmarshal(m.SessionTimeout, dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HeartbeatPeriod", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowConfig
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthConfig
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthConfig
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.HeartbeatPeriod == nil {
+				m.HeartbeatPeriod = new(time.Duration)
+			}
+			if err := github_com_gogo_protobuf_types.StdDurationUnmarshal(m.HeartbeatPeriod, dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ElectionTimeout", wireType)
 			}
 			var msglen int
@@ -427,83 +550,11 @@ func (m *ProtocolConfig) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field HeartbeatInterval", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowConfig
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthConfig
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthConfig
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.HeartbeatInterval == nil {
-				m.HeartbeatInterval = new(time.Duration)
-			}
-			if err := github_com_gogo_protobuf_types.StdDurationUnmarshal(m.HeartbeatInterval, dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SnapshotInterval", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowConfig
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthConfig
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthConfig
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.SnapshotInterval == nil {
-				m.SnapshotInterval = new(time.Duration)
-			}
-			if err := github_com_gogo_protobuf_types.StdDurationUnmarshal(m.SnapshotInterval, dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
 		case 4:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SnapshotThreshold", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field SnapshotEntryThreshold", wireType)
 			}
-			m.SnapshotThreshold = 0
+			m.SnapshotEntryThreshold = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowConfig
@@ -513,7 +564,26 @@ func (m *ProtocolConfig) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.SnapshotThreshold |= uint64(b&0x7F) << shift
+				m.SnapshotEntryThreshold |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CompactionRetainEntries", wireType)
+			}
+			m.CompactionRetainEntries = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowConfig
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.CompactionRetainEntries |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}

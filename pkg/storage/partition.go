@@ -68,6 +68,14 @@ func (c *Partition) Leader() string {
 	return c.members[leader]
 }
 
+func (c *Partition) Followers() []string {
+
+}
+
+func (c *Partition) WatchConfig(ctx context.Context, ch chan<- rsm.PartitionConfig) error {
+
+}
+
 // SyncCommand executes a state machine command on the partition
 func (c *Partition) SyncCommand(ctx context.Context, input []byte, stream streams.WriteStream) error {
 	streamID, stream := c.streams.addStream(stream)

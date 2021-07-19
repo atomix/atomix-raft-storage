@@ -22,6 +22,7 @@ import (
 	logutil "github.com/atomix/atomix-controller/pkg/controller/util/log"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	storagev2beta1 "github.com/atomix/atomix-raft-storage/pkg/controller/storage/v2beta1"
+	storagev2beta2 "github.com/atomix/atomix-raft-storage/pkg/controller/storage/v2beta2"
 
 	"os"
 	"runtime"
@@ -103,6 +104,12 @@ func main() {
 
 	// Add the storage/v2beta1 controllers
 	if err := storagev2beta1.AddControllers(mgr); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
+	// Add the storage/v2beta2 controllers
+	if err := storagev2beta2.AddControllers(mgr); err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}

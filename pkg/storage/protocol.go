@@ -27,10 +27,10 @@ import (
 	"github.com/lni/dragonboat/v3/statemachine"
 	"sort"
 	"sync"
+	"time"
 )
 
 const dataDir = "/var/lib/atomix/data"
-const rttMillisecond = 200
 
 var log = logging.GetLogger("atomix", "raft")
 
@@ -172,10 +172,15 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 	defer cancel()
 	p.watch(ctx, eventCh)
 
+	rtt := uint64(250 * time.Millisecond)
+	if p.config.HeartbeatPeriod != nil {
+		rtt = uint64(p.config.HeartbeatPeriod.Milliseconds())
+	}
+
 	nodeConfig := raftconfig.NodeHostConfig{
 		WALDir:              dataDir,
 		NodeHostDir:         dataDir,
-		RTTMillisecond:      rttMillisecond,
+		RTTMillisecond:      rtt,
 		RaftAddress:         address,
 		RaftEventListener:   p.listener,
 		SystemEventListener: p.listener,
@@ -196,15 +201,21 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 		return fsm
 	}
 
+	electionRTT := uint64(10)
+	if p.config.ElectionTimeout != nil {
+		electionRTT = uint64(p.config.ElectionTimeout.Milliseconds()) / rtt
+	}
+
 	for _, partition := range c.Partitions() {
 		config := raftconfig.Config{
 			NodeID:             nodeID,
 			ClusterID:          uint64(partition.ID()),
-			ElectionRTT:        10,
+			ElectionRTT:        electionRTT,
 			HeartbeatRTT:       1,
 			CheckQuorum:        true,
-			SnapshotEntries:    p.config.GetSnapshotThresholdOrDefault(),
-			CompactionOverhead: p.config.GetSnapshotThresholdOrDefault() / 10,
+			SnapshotEntries:    p.config.SnapshotEntryThreshold,
+			CompactionOverhead: p.config.CompactionRetainEntries,
+			IsObserver:         member.ReadOnly,
 		}
 
 		server := newServer(uint64(partition.ID()), memberAddresses, node, config, fsmFactory)
