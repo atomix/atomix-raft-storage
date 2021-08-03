@@ -16,7 +16,15 @@ package v2beta2
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"github.com/atomix/atomix-raft-storage/pkg/storage"
+	"github.com/cenkalti/backoff"
+	"google.golang.org/grpc"
+	"io"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -80,8 +88,8 @@ type RaftMemberReconciler struct {
 // and what is in the Cluster.Spec
 func (r *RaftMemberReconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.Info("Reconcile RaftMember")
-	group := &storagev2beta2.RaftMember{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, group)
+	member := &storagev2beta2.RaftMember{}
+	err := r.client.Get(context.TODO(), request.NamespacedName, member)
 	if err != nil {
 		log.Error(err, "Reconcile RaftMember")
 		if k8serrors.IsNotFound(err) {
@@ -90,7 +98,7 @@ func (r *RaftMemberReconciler) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	ok, err := r.reconcileMembers(cluster, group)
+	ok, err := r.reconcileStatus(member)
 	if err != nil {
 		log.Error(err, "Reconcile RaftMember")
 		return reconcile.Result{}, err
@@ -98,6 +106,491 @@ func (r *RaftMemberReconciler) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{}, nil
 	}
 	return reconcile.Result{}, nil
+}
+
+func (r *RaftMemberReconciler) reconcileStatus(member *storagev2beta2.RaftMember) (bool, error) {
+	go r.startMonitoringPod(member)
+	return false, nil
+}
+
+func (r *RaftMemberReconciler) startMonitoringPod(member *storagev2beta2.RaftMember) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	_, ok := r.streams[member.Name]
+	if ok {
+		return nil
+	}
+
+	pod := &corev1.Pod{}
+	podName := types.NamespacedName{
+		Namespace: member.Namespace,
+		Name:      member.Spec.PodName,
+	}
+	if err := r.client.Get(context.TODO(), podName, pod); err != nil {
+		return err
+	}
+
+	conn, err := grpc.Dial(
+		fmt.Sprintf("%s:%d", pod.Status.PodIP, monitoringPort),
+		grpc.WithInsecure())
+	if err != nil {
+		return err
+	}
+
+	client := storage.NewRaftEventsClient(conn)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	stream, err := client.Subscribe(ctx, &storage.SubscribeRequest{})
+	if err != nil {
+		cancel()
+		return err
+	}
+
+	r.streams[member.Name] = cancel
+	go func() {
+		defer func() {
+			cancel()
+			r.mu.Lock()
+			delete(r.streams, member.Name)
+			r.mu.Unlock()
+			go r.startMonitoringPod(member)
+		}()
+
+		group, err := r.getGroup(member)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		partitionID := int(group.Spec.GroupID)
+
+		memberName := types.NamespacedName{
+			Namespace: member.Namespace,
+			Name:      member.Name,
+		}
+
+		for {
+			event, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return
+			}
+
+			log.Infof("Received event %+v from %s", event, member.Name)
+
+			switch e := event.Event.(type) {
+			case *storage.RaftEvent_MemberReady:
+				if int(e.MemberReady.Partition) == partitionID {
+					r.recordPartitionReady(memberName, e.MemberReady, metav1.NewTime(event.Timestamp))
+				}
+			case *storage.RaftEvent_LeaderUpdated:
+				if int(e.LeaderUpdated.Partition) == partitionID {
+					r.recordLeaderUpdated(memberName, e.LeaderUpdated, metav1.NewTime(event.Timestamp))
+				}
+			case *storage.RaftEvent_MembershipChanged:
+				if int(e.MembershipChanged.Partition) == partitionID {
+					r.recordMembershipChanged(memberName, e.MembershipChanged, metav1.NewTime(event.Timestamp))
+				}
+			case *storage.RaftEvent_SendSnapshotStarted:
+				if int(e.SendSnapshotStarted.Partition) == partitionID {
+					r.recordSendSnapshotStarted(memberName, e.SendSnapshotStarted, metav1.NewTime(event.Timestamp))
+				}
+			case *storage.RaftEvent_SendSnapshotCompleted:
+				if int(e.SendSnapshotCompleted.Partition) == partitionID {
+					r.recordSendSnapshotCompleted(memberName, e.SendSnapshotCompleted, metav1.NewTime(event.Timestamp))
+				}
+			case *storage.RaftEvent_SendSnapshotAborted:
+				if int(e.SendSnapshotAborted.Partition) == partitionID {
+					r.recordSendSnapshotAborted(memberName, e.SendSnapshotAborted, metav1.NewTime(event.Timestamp))
+				}
+			case *storage.RaftEvent_SnapshotReceived:
+				if int(e.SnapshotReceived.Partition) == partitionID {
+					r.recordSnapshotReceived(memberName, e.SnapshotReceived, metav1.NewTime(event.Timestamp))
+				}
+			case *storage.RaftEvent_SnapshotRecovered:
+				if int(e.SnapshotRecovered.Partition) == partitionID {
+					r.recordSnapshotRecovered(memberName, e.SnapshotRecovered, metav1.NewTime(event.Timestamp))
+				}
+			case *storage.RaftEvent_SnapshotCreated:
+				if int(e.SnapshotCreated.Partition) == partitionID {
+					r.recordSnapshotCreated(memberName, e.SnapshotCreated, metav1.NewTime(event.Timestamp))
+				}
+			case *storage.RaftEvent_SnapshotCompacted:
+				if int(e.SnapshotCompacted.Partition) == partitionID {
+					r.recordSnapshotCompacted(memberName, e.SnapshotCompacted, metav1.NewTime(event.Timestamp))
+				}
+			case *storage.RaftEvent_LogCompacted:
+				if int(e.LogCompacted.Partition) == partitionID {
+					r.recordLogCompacted(memberName, e.LogCompacted, metav1.NewTime(event.Timestamp))
+				}
+			case *storage.RaftEvent_LogdbCompacted:
+				if int(e.LogdbCompacted.Partition) == partitionID {
+					r.recordLogDBCompacted(memberName, e.LogdbCompacted, metav1.NewTime(event.Timestamp))
+				}
+			case *storage.RaftEvent_ConnectionEstablished:
+				r.recordConnectionEstablished(memberName, e.ConnectionEstablished, metav1.NewTime(event.Timestamp))
+			case *storage.RaftEvent_ConnectionFailed:
+				r.recordConnectionFailed(memberName, e.ConnectionFailed, metav1.NewTime(event.Timestamp))
+			}
+		}
+	}()
+	return nil
+}
+
+func (r *RaftMemberReconciler) getMember(memberName types.NamespacedName) (*storagev2beta2.RaftMember, error) {
+	member := &storagev2beta2.RaftMember{}
+	if err := r.client.Get(context.TODO(), memberName, member); err != nil {
+		return nil, err
+	}
+	return member, nil
+}
+
+func (r *RaftMemberReconciler) getGroup(member *storagev2beta2.RaftMember) (*storagev2beta2.RaftGroup, error) {
+	for _, ref := range member.OwnerReferences {
+		if ref.Controller != nil && *ref.Controller {
+			groupName := types.NamespacedName{
+				Namespace: member.Namespace,
+				Name:      ref.Name,
+			}
+			group := &storagev2beta2.RaftGroup{}
+			if err := r.client.Get(context.TODO(), groupName, group); err != nil {
+				return nil, err
+			}
+			return group, nil
+		}
+	}
+	return nil, errors.New("invalid group member")
+}
+
+func (r *RaftMemberReconciler) getPod(member *storagev2beta2.RaftMember) (*corev1.Pod, error) {
+	pod := &corev1.Pod{}
+	podName := types.NamespacedName{
+		Namespace: member.Namespace,
+		Name:      member.Spec.PodName,
+	}
+	if err := r.client.Get(context.TODO(), podName, pod); err != nil {
+		return nil, err
+	}
+	return pod, nil
+}
+
+func (r *RaftMemberReconciler) recordPartitionReady(memberName types.NamespacedName, event *storage.MemberReadyEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+	r.events.Eventf(pod, "Normal", "MemberReady", "Member is ready to receive requests on partition %d", event.Partition)
+	r.events.Eventf(member, "Normal", "Ready", "Member is ready to receive requests")
+
+	err = backoff.Retry(func() error {
+		member, err := r.getMember(memberName)
+		if err != nil {
+			log.Error(err)
+		}
+		state := storagev2beta2.RaftMemberReady
+		return r.updateMemberStatus(member, storagev2beta2.RaftMemberStatus{
+			State:       &state,
+			LastUpdated: &timestamp,
+		})
+	}, backoff.NewExponentialBackOff())
+	if err != nil {
+		log.Error(err)
+	}
+}
+
+func (r *RaftMemberReconciler) recordLeaderUpdated(memberName types.NamespacedName, event *storage.LeaderUpdatedEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+
+	if member.Status.Term == nil || *member.Status.Term != event.Term {
+		r.events.Eventf(member, "Normal", "TermChanged", "Term changed to %d", event.Term)
+		r.events.Eventf(pod, "Normal", "PartitionTermChanged", "Term for partition %d changed to %d", event.Partition, event.Term)
+	}
+
+	if event.Leader != "" && (member.Status.Leader == nil || *member.Status.Leader != event.Leader) {
+		r.events.Eventf(member, "Normal", "LeaderChanged", "Leader for term %d changed to %s", event.Term, event.Leader)
+		r.events.Eventf(pod, "Normal", "PartitionLeaderChanged", "Leader for partition %d changed to %s for term %d", event.Partition, event.Leader, event.Term)
+	}
+
+	err = backoff.Retry(func() error {
+		member, err := r.getMember(memberName)
+		if err != nil {
+			log.Error(err)
+		}
+		role := storagev2beta2.RaftFollower
+		if event.Leader == member.Spec.PodName {
+			role = storagev2beta2.RaftLeader
+		}
+		var leader *string
+		if event.Leader != "" {
+			leader = &event.Leader
+		}
+		return r.updateMemberStatus(member, storagev2beta2.RaftMemberStatus{
+			Role:        &role,
+			Term:        &event.Term,
+			Leader:      leader,
+			LastUpdated: &timestamp,
+		})
+	}, backoff.NewExponentialBackOff())
+	if err != nil {
+		log.Error(err)
+	}
+}
+
+func (r *RaftMemberReconciler) recordMembershipChanged(memberName types.NamespacedName, event *storage.MembershipChangedEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+	r.events.Eventf(pod, "Normal", "PartitionMembershipChanged", "Membership changed in partition %d", event.Partition)
+	r.events.Eventf(member, "Normal", "MembershipChanged", "Membership changed")
+}
+
+func (r *RaftMemberReconciler) recordSendSnapshotStarted(memberName types.NamespacedName, event *storage.SendSnapshotStartedEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+	r.events.Eventf(pod, "Normal", "PartitionSendSnapshotStared", "Started sending partition %d snapshot at index %d to %s", event.Partition, event.Index, event.To)
+	r.events.Eventf(member, "Normal", "SendSnapshotStared", "Started sending snapshot at index %d to %s", event.Index, event.To)
+}
+
+func (r *RaftMemberReconciler) recordSendSnapshotCompleted(memberName types.NamespacedName, event *storage.SendSnapshotCompletedEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+	r.events.Eventf(pod, "Normal", "PartitionSendSnapshotCompleted", "Completed sending partition %d snapshot at index %d to %s", event.Partition, event.Index, event.To)
+	r.events.Eventf(member, "Normal", "SendSnapshotCompleted", "Completed sending snapshot at index %d to %s", event.Index, event.To)
+}
+
+func (r *RaftMemberReconciler) recordSendSnapshotAborted(memberName types.NamespacedName, event *storage.SendSnapshotAbortedEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+	r.events.Eventf(pod, "Warning", "PartitionSendSnapshotAborted", "Aborted sending partition %d snapshot at index %d to %s", event.Partition, event.Index, event.To)
+	r.events.Eventf(member, "Warning", "SendSnapshotAborted", "Aborted sending snapshot at index %d to %s", event.Index, event.To)
+}
+
+func (r *RaftMemberReconciler) recordSnapshotReceived(memberName types.NamespacedName, event *storage.SnapshotReceivedEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+	r.events.Eventf(pod, "Normal", "PartitionSnapshotReceived", "Partition %d received snapshot at index %d from %s", event.Partition, event.Index, event.From)
+	r.events.Eventf(member, "Normal", "SnapshotReceived", "Received snapshot at index %d from %s", event.Index, event.From)
+
+	err = backoff.Retry(func() error {
+		member, err := r.getMember(memberName)
+		if err != nil {
+			log.Error(err)
+		}
+		now := metav1.Now()
+		return r.updateMemberStatus(member, storagev2beta2.RaftMemberStatus{
+			LastSnapshotIndex: &event.Index,
+			LastSnapshotTime:  &now,
+			LastUpdated:       &timestamp,
+		})
+	}, backoff.NewExponentialBackOff())
+}
+
+func (r *RaftMemberReconciler) recordSnapshotRecovered(memberName types.NamespacedName, event *storage.SnapshotRecoveredEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+	r.events.Eventf(pod, "Normal", "PartitionSnapshotRecovered", "Recovered partition %d from snapshot at index %d", event.Partition, event.Index)
+	r.events.Eventf(member, "Normal", "SnapshotRecovered", "Recovered from snapshot at index %d", event.Index)
+
+	err = backoff.Retry(func() error {
+		member, err := r.getMember(memberName)
+		if err != nil {
+			log.Error(err)
+		}
+		now := metav1.Now()
+		return r.updateMemberStatus(member, storagev2beta2.RaftMemberStatus{
+			LastSnapshotIndex: &event.Index,
+			LastSnapshotTime:  &now,
+			LastUpdated:       &timestamp,
+		})
+	}, backoff.NewExponentialBackOff())
+}
+
+func (r *RaftMemberReconciler) recordSnapshotCreated(memberName types.NamespacedName, event *storage.SnapshotCreatedEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+	r.events.Eventf(pod, "Normal", "PartitionSnapshotCreated", "Created partition %d snapshot at index %d", event.Partition, event.Index)
+	r.events.Eventf(member, "Normal", "SnapshotCreated", "Created snapshot at index %d", event.Index)
+
+	err = backoff.Retry(func() error {
+		member, err := r.getMember(memberName)
+		if err != nil {
+			log.Error(err)
+		}
+		now := metav1.Now()
+		return r.updateMemberStatus(member, storagev2beta2.RaftMemberStatus{
+			LastSnapshotIndex: &event.Index,
+			LastSnapshotTime:  &now,
+			LastUpdated:       &timestamp,
+		})
+	}, backoff.NewExponentialBackOff())
+}
+
+func (r *RaftMemberReconciler) recordSnapshotCompacted(memberName types.NamespacedName, event *storage.SnapshotCompactedEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+	r.events.Eventf(pod, "Normal", "PartitionSnapshotCompacted", "Compacted partition %d snapshot at index %d", event.Partition, event.Index)
+	r.events.Eventf(member, "Normal", "SnapshotCompacted", "Compacted snapshot at index %d", event.Index)
+
+	err = backoff.Retry(func() error {
+		member, err := r.getMember(memberName)
+		if err != nil {
+			log.Error(err)
+		}
+		now := metav1.Now()
+		return r.updateMemberStatus(member, storagev2beta2.RaftMemberStatus{
+			LastSnapshotIndex: &event.Index,
+			LastSnapshotTime:  &now,
+			LastUpdated:       &timestamp,
+		})
+	}, backoff.NewExponentialBackOff())
+}
+
+func (r *RaftMemberReconciler) recordLogCompacted(memberName types.NamespacedName, event *storage.LogCompactedEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+	r.events.Eventf(pod, "Normal", "PartitionLogCompacted", "Log in partition %d compacted at index %d", event.Partition, event.Index)
+	r.events.Eventf(member, "Normal", "LogCompacted", "Log compacted at index %d", event.Index)
+}
+
+func (r *RaftMemberReconciler) recordLogDBCompacted(memberName types.NamespacedName, event *storage.LogDBCompactedEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+	r.events.Eventf(pod, "Normal", "PartitionLogDBCompacted", "LogDB in partition %d compacted at index %d", event.Partition, event.Index)
+	r.events.Eventf(member, "Normal", "LogDBCompacted", "LogDB compacted at index %d", event.Index)
+}
+
+func (r *RaftMemberReconciler) recordConnectionEstablished(memberName types.NamespacedName, event *storage.ConnectionEstablishedEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+	r.events.Eventf(pod, "Normal", "ConnectionEstablished", "Connection established to %s", event.Address)
+}
+
+func (r *RaftMemberReconciler) recordConnectionFailed(memberName types.NamespacedName, event *storage.ConnectionFailedEvent, timestamp metav1.Time) {
+	member, err := r.getMember(memberName)
+	if err != nil {
+		log.Error(err)
+	}
+	pod, err := r.getPod(member)
+	if err != nil {
+		log.Error(err)
+	}
+	r.events.Eventf(pod, "Warning", "ConnectionFailed", "Connection to %s failed", event.Address)
+}
+
+func (r *RaftMemberReconciler) updateMemberStatus(member *storagev2beta2.RaftMember, status storagev2beta2.RaftMemberStatus) error {
+	updated := true
+	if status.Term != nil && (member.Status.Term == nil || *status.Term > *member.Status.Term) {
+		member.Status.Term = status.Term
+		member.Status.Leader = nil
+		updated = true
+	}
+	if status.Leader != nil && (member.Status.Leader == nil || member.Status.Leader != status.Leader) {
+		member.Status.Leader = status.Leader
+		updated = true
+	}
+	if status.State != nil && (member.Status.State == nil || member.Status.State != status.State) {
+		member.Status.State = status.State
+		updated = true
+	}
+	if status.Role != nil && (member.Status.Role == nil || *member.Status.Role != *status.Role) {
+		member.Status.Role = status.Role
+		updated = true
+	}
+	if status.LastUpdated != nil && (member.Status.LastUpdated == nil || status.LastUpdated.After(member.Status.LastUpdated.Time)) {
+		member.Status.LastUpdated = status.LastUpdated
+		updated = true
+	}
+	if status.LastSnapshotIndex != nil && (member.Status.LastSnapshotIndex == nil || *status.LastSnapshotIndex > *member.Status.LastSnapshotIndex) {
+		member.Status.LastSnapshotIndex = status.LastSnapshotIndex
+		updated = true
+	}
+	if status.LastSnapshotTime != nil && (member.Status.LastSnapshotTime == nil || status.LastSnapshotTime.After(member.Status.LastSnapshotTime.Time)) {
+		member.Status.LastSnapshotTime = status.LastSnapshotTime
+		updated = true
+	}
+	if updated {
+		return r.client.Status().Update(context.TODO(), member)
+	}
+	return nil
 }
 
 var _ reconcile.Reconciler = (*RaftMemberReconciler)(nil)

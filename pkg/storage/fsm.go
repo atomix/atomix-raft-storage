@@ -28,7 +28,7 @@ import (
 func newStateMachine(cluster cluster.Cluster, partitionID protocol.PartitionID, registry *protocol.Registry, streams *streamManager) *StateMachine {
 	return &StateMachine{
 		partition: partitionID,
-		state:     protocol.NewManager(cluster, registry),
+		state:     protocol.NewStateMachine(registry),
 		streams:   streams,
 	}
 }
@@ -36,7 +36,7 @@ func newStateMachine(cluster cluster.Cluster, partitionID protocol.PartitionID, 
 // StateMachine is a Raft state machine
 type StateMachine struct {
 	partition protocol.PartitionID
-	state     *protocol.Manager
+	state     protocol.StateMachine
 	streams   *streamManager
 	mu        sync.Mutex
 }
@@ -72,7 +72,7 @@ func (s *StateMachine) SaveSnapshot(writer io.Writer, files statemachine.ISnapsh
 
 // RecoverFromSnapshot recovers the state machine state from a snapshot
 func (s *StateMachine) RecoverFromSnapshot(reader io.Reader, files []statemachine.SnapshotFile, done <-chan struct{}) error {
-	return s.state.Install(reader)
+	return s.state.Restore(reader)
 }
 
 // Close closes the state machine

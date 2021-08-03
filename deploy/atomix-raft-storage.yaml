@@ -517,6 +517,9 @@ spec:
           spec:
             type: object
             properties:
+              groupId:
+                type: integer
+                minumum: 1
               members:
                 type: integer
                 minimum: 1
@@ -699,7 +702,11 @@ spec:
         properties:
           spec:
             type: object
+            required:
+            - podName
             properties:
+              podName:
+                type: string
               readOnly:
                 type: boolean
           status:

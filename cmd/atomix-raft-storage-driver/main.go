@@ -25,10 +25,8 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/counter"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/election"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/indexedmap"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/leader"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/list"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/lock"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/log"
 	_map "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/map"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/set"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/value"
@@ -57,8 +55,6 @@ func main() {
 		election.Register(p)
 		indexedmap.Register(p)
 		lock.Register(p)
-		log.Register(p)
-		leader.Register(p)
 		list.Register(p)
 		_map.Register(p)
 		set.Register(p)

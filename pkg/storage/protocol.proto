@@ -59,7 +59,7 @@ message RaftEvent {
 }
 
 message PartitionEvent {
-    uint64 partition = 1;
+    uint32 partition = 1;
 }
 
 message MemberReadyEvent {

@@ -28,6 +28,8 @@ const (
 
 // RaftGroupSpec specifies a RaftGroupSpec configuration
 type RaftGroupSpec struct {
+	GroupID int32 `json:"groupId,omitempty"`
+
 	// Members is the number of members in the group
 	Members *int32 `json:"members,omitempty"`
 

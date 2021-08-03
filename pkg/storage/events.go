@@ -68,7 +68,7 @@ func (e *raftEventListener) LeaderUpdated(info raftio.LeaderInfo) {
 			LeaderUpdated: &LeaderUpdatedEvent{
 				LeaderEvent: LeaderEvent{
 					PartitionEvent: PartitionEvent{
-						Partition: info.ClusterID,
+						Partition: uint32(info.ClusterID),
 					},
 					Term:   info.Term,
 					Leader: e.protocol.getMemberID(info.LeaderID),
@@ -92,7 +92,7 @@ func (e *raftEventListener) NodeReady(info raftio.NodeInfo) {
 		Event: &RaftEvent_MemberReady{
 			MemberReady: &MemberReadyEvent{
 				PartitionEvent: PartitionEvent{
-					Partition: info.ClusterID,
+					Partition: uint32(info.ClusterID),
 				},
 			},
 		},
@@ -105,7 +105,7 @@ func (e *raftEventListener) MembershipChanged(info raftio.NodeInfo) {
 		Event: &RaftEvent_MembershipChanged{
 			MembershipChanged: &MembershipChangedEvent{
 				PartitionEvent: PartitionEvent{
-					Partition: info.ClusterID,
+					Partition: uint32(info.ClusterID),
 				},
 			},
 		},
@@ -147,7 +147,7 @@ func (e *raftEventListener) SendSnapshotStarted(info raftio.SnapshotInfo) {
 			SendSnapshotStarted: &SendSnapshotStartedEvent{
 				SnapshotEvent: SnapshotEvent{
 					PartitionEvent: PartitionEvent{
-						Partition: info.ClusterID,
+						Partition: uint32(info.ClusterID),
 					},
 					Index: info.Index,
 				},
@@ -164,7 +164,7 @@ func (e *raftEventListener) SendSnapshotCompleted(info raftio.SnapshotInfo) {
 			SendSnapshotCompleted: &SendSnapshotCompletedEvent{
 				SnapshotEvent: SnapshotEvent{
 					PartitionEvent: PartitionEvent{
-						Partition: info.ClusterID,
+						Partition: uint32(info.ClusterID),
 					},
 					Index: info.Index,
 				},
@@ -181,7 +181,7 @@ func (e *raftEventListener) SendSnapshotAborted(info raftio.SnapshotInfo) {
 			SendSnapshotAborted: &SendSnapshotAbortedEvent{
 				SnapshotEvent: SnapshotEvent{
 					PartitionEvent: PartitionEvent{
-						Partition: info.ClusterID,
+						Partition: uint32(info.ClusterID),
 					},
 					Index: info.Index,
 				},
@@ -198,7 +198,7 @@ func (e *raftEventListener) SnapshotReceived(info raftio.SnapshotInfo) {
 			SnapshotReceived: &SnapshotReceivedEvent{
 				SnapshotEvent: SnapshotEvent{
 					PartitionEvent: PartitionEvent{
-						Partition: info.ClusterID,
+						Partition: uint32(info.ClusterID),
 					},
 					Index: info.Index,
 				},
@@ -215,7 +215,7 @@ func (e *raftEventListener) SnapshotRecovered(info raftio.SnapshotInfo) {
 			SnapshotRecovered: &SnapshotRecoveredEvent{
 				SnapshotEvent: SnapshotEvent{
 					PartitionEvent: PartitionEvent{
-						Partition: info.ClusterID,
+						Partition: uint32(info.ClusterID),
 					},
 					Index: info.Index,
 				},
@@ -231,7 +231,7 @@ func (e *raftEventListener) SnapshotCreated(info raftio.SnapshotInfo) {
 			SnapshotCreated: &SnapshotCreatedEvent{
 				SnapshotEvent: SnapshotEvent{
 					PartitionEvent: PartitionEvent{
-						Partition: info.ClusterID,
+						Partition: uint32(info.ClusterID),
 					},
 					Index: info.Index,
 				},
@@ -247,7 +247,7 @@ func (e *raftEventListener) SnapshotCompacted(info raftio.SnapshotInfo) {
 			SnapshotCompacted: &SnapshotCompactedEvent{
 				SnapshotEvent: SnapshotEvent{
 					PartitionEvent: PartitionEvent{
-						Partition: info.ClusterID,
+						Partition: uint32(info.ClusterID),
 					},
 					Index: info.Index,
 				},
@@ -263,7 +263,7 @@ func (e *raftEventListener) LogCompacted(info raftio.EntryInfo) {
 			LogCompacted: &LogCompactedEvent{
 				LogEvent: LogEvent{
 					PartitionEvent: PartitionEvent{
-						Partition: info.ClusterID,
+						Partition: uint32(info.ClusterID),
 					},
 					Index: info.Index,
 				},
@@ -279,7 +279,7 @@ func (e *raftEventListener) LogDBCompacted(info raftio.EntryInfo) {
 			LogdbCompacted: &LogDBCompactedEvent{
 				LogEvent: LogEvent{
 					PartitionEvent: PartitionEvent{
-						Partition: info.ClusterID,
+						Partition: uint32(info.ClusterID),
 					},
 					Index: info.Index,
 				},

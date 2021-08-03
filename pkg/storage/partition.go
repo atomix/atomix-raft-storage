@@ -20,6 +20,8 @@ import (
 	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 	"github.com/lni/dragonboat/v3"
+	"sort"
+	"sync"
 	"time"
 )
 
@@ -38,11 +40,15 @@ func newPartition(clusterID uint64, nodeID uint64, node *dragonboat.NodeHost, me
 
 // Partition is a Raft partition
 type Partition struct {
-	clusterID uint64
-	nodeID    uint64
-	node      *dragonboat.NodeHost
-	members   map[uint64]string
-	streams   *streamManager
+	clusterID  uint64
+	nodeID     uint64
+	node       *dragonboat.NodeHost
+	members    map[uint64]string
+	streams    *streamManager
+	config     rsm.PartitionConfig
+	listeners  map[int]chan<- rsm.PartitionConfig
+	listenerID int
+	mu         sync.RWMutex
 }
 
 // MustLeader returns whether the Raft partition requires a leader
@@ -61,19 +67,55 @@ func (c *Partition) IsLeader() bool {
 
 // Leader returns the leader address for this partition
 func (c *Partition) Leader() string {
-	leader, ok, err := c.node.GetLeaderID(c.clusterID)
-	if !ok || err != nil {
-		return ""
-	}
-	return c.members[leader]
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.config.Leader
 }
 
 func (c *Partition) Followers() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.config.Followers
+}
 
+func (c *Partition) updateConfig(leader string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	config := rsm.PartitionConfig{}
+	config.Leader = leader
+	config.Followers = make([]string, 0, len(c.members))
+	for _, member := range c.members {
+		if member != leader {
+			config.Followers = append(config.Followers, member)
+		}
+	}
+	sort.Slice(config.Followers, func(i, j int) bool {
+		return config.Followers[i] < config.Followers[j]
+	})
+
+	c.config = config
+	for _, listener := range c.listeners {
+		listener <- config
+	}
 }
 
 func (c *Partition) WatchConfig(ctx context.Context, ch chan<- rsm.PartitionConfig) error {
-
+	c.listenerID++
+	id := c.listenerID
+	c.mu.Lock()
+	c.listeners[id] = ch
+	c.mu.Unlock()
+	go func() {
+		c.mu.RLock()
+		ch <- c.config
+		c.mu.RUnlock()
+		<-ctx.Done()
+		c.mu.Lock()
+		close(ch)
+		delete(c.listeners, id)
+		c.mu.Unlock()
+	}()
+	return nil
 }
 
 // SyncCommand executes a state machine command on the partition

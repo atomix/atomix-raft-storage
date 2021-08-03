@@ -35,7 +35,8 @@ const (
 
 // RaftMemberSpec specifies a RaftMemberSpec configuration
 type RaftMemberSpec struct {
-	ReadOnly bool `json:"readOnly,omitempty"`
+	PodName  string `json:"podName,omitempty"`
+	ReadOnly bool   `json:"readOnly,omitempty"`
 }
 
 // RaftMemberStatus defines the status of a RaftMember

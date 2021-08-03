@@ -16,11 +16,18 @@ package v2beta2
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
+	"github.com/golang/protobuf/jsonpb"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"os"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -35,6 +42,33 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+const (
+	apiPort               = 5678
+	protocolPortName      = "raft"
+	protocolPort          = 5679
+	probePort             = 5679
+	defaultImageEnv       = "DEFAULT_NODE_V2BETA1_IMAGE"
+	defaultImage          = "atomix/atomix-raft-storage-node:latest"
+	headlessServiceSuffix = "hs"
+	appLabel              = "app"
+	clusterLabel          = "cluster"
+	appAtomix             = "atomix"
+)
+
+const (
+	configPath         = "/etc/atomix"
+	clusterConfigFile  = "cluster.json"
+	protocolConfigFile = "protocol.json"
+	dataPath           = "/var/lib/atomix"
+)
+
+const (
+	configVolume = "config"
+	dataVolume   = "data"
+)
+
+const monitoringPort = 5000
 
 func addMultiRaftClusterController(mgr manager.Manager) error {
 	options := controller.Options{
@@ -104,7 +138,7 @@ func (r *MultiRaftClusterReconciler) Reconcile(request reconcile.Request) (recon
 }
 
 func (r *MultiRaftClusterReconciler) reconcileGroups(cluster *storagev2beta2.MultiRaftCluster) (bool, error) {
-	for i := 0; i < int(cluster.Spec.Groups); i++ {
+	for i := 1; i < int(cluster.Spec.Groups); i++ {
 		if ok, err := r.reconcileGroup(cluster, i); err != nil {
 			return false, err
 		} else if ok {
@@ -124,13 +158,15 @@ func (r *MultiRaftClusterReconciler) reconcileGroup(cluster *storagev2beta2.Mult
 		if !k8serrors.IsNotFound(err) {
 			return false, err
 		}
+		groupSpec := cluster.Spec.GroupTemplate.Spec
+		groupSpec.GroupID = int32(groupID)
 		group = &storagev2beta2.RaftGroup{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: groupName.Namespace,
 				Name:      groupName.Name,
 				Labels:    cluster.Labels,
 			},
-			Spec: cluster.Spec.GroupTemplate.Spec,
+			Spec: groupSpec,
 		}
 		if err := controllerutil.SetControllerReference(cluster, group, r.scheme); err != nil {
 			return false, err
@@ -143,4 +179,406 @@ func (r *MultiRaftClusterReconciler) reconcileGroup(cluster *storagev2beta2.Mult
 	return false, nil
 }
 
+func (r *MultiRaftClusterReconciler) reconcileConfigMap(cluster *storagev2beta2.MultiRaftCluster) error {
+	log.Info("Reconcile raft protocol config map")
+	cm := &corev1.ConfigMap{}
+	name := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name,
+	}
+	err := r.client.Get(context.TODO(), name, cm)
+	if err != nil && k8serrors.IsNotFound(err) {
+		err = r.addConfigMap(cluster)
+	}
+	return err
+}
+
+func (r *MultiRaftClusterReconciler) addConfigMap(cluster *storagev2beta2.MultiRaftCluster) error {
+	log.Info("Creating raft ConfigMap", "Name", cluster.Name, "Namespace", cluster.Namespace)
+	var config interface{}
+
+	clusterConfig, err := newNodeConfigString(cluster)
+	if err != nil {
+		return err
+	}
+
+	protocolConfig, err := newProtocolConfigString(config)
+	if err != nil {
+		return err
+	}
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+			Labels:    newClusterLabels(cluster),
+		},
+		Data: map[string]string{
+			clusterConfigFile:  clusterConfig,
+			protocolConfigFile: protocolConfig,
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, cm, r.scheme); err != nil {
+		return err
+	}
+	return r.client.Create(context.TODO(), cm)
+}
+
+// newNodeConfigString creates a node configuration string for the given cluster
+func newNodeConfigString(cluster *storagev2beta2.MultiRaftCluster) (string, error) {
+	numReplicas := getNumReplicas(cluster)
+	replicas := make([]protocolapi.ProtocolReplica, numReplicas)
+	for i := 0; i < numReplicas; i++ {
+		replicas[i] = protocolapi.ProtocolReplica{
+			ID:      fmt.Sprintf("%s-%d", cluster.Name, i),
+			Host:    fmt.Sprintf("%s-%d.%s.%s", cluster.Name, i, getClusterHeadlessServiceName(cluster), cluster.Namespace),
+			APIPort: apiPort,
+			ExtraPorts: map[string]int32{
+				protocolPortName: protocolPort,
+			},
+		}
+	}
+
+	numPartitions := getNumPartitions(cluster)
+	partitions := make([]protocolapi.ProtocolPartition, numPartitions)
+	for i := 0; i < numPartitions; i++ {
+		partitionID := i + 1
+		numMembers := getNumMembers(cluster)
+		numROMembers := getNumROMembers(cluster)
+		members := make([]string, numMembers)
+		for j := 0; j < numMembers; j++ {
+			members[j] = fmt.Sprintf("%s-%d", cluster.Name, (((numMembers+numROMembers)*partitionID)+j)%numReplicas)
+		}
+		roMembers := make([]string, numROMembers)
+		for j := 0; j < numROMembers; j++ {
+			members[j] = fmt.Sprintf("%s-%d", cluster.Name, (((numMembers+numROMembers)*partitionID)+numMembers+j)%numReplicas)
+		}
+		partitions[i] = protocolapi.ProtocolPartition{
+			PartitionID:  uint32(partitionID),
+			Replicas:     members,
+			ReadReplicas: roMembers,
+		}
+	}
+
+	config := &protocolapi.ProtocolConfig{
+		Replicas:   replicas,
+		Partitions: partitions,
+	}
+
+	marshaller := jsonpb.Marshaler{}
+	return marshaller.MarshalToString(config)
+}
+
+// newProtocolConfigString creates a protocol configuration string for the given cluster and protocol
+func newProtocolConfigString(config interface{}) (string, error) {
+	bytes, err := json.Marshal(config)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
+}
+
+func (r *MultiRaftClusterReconciler) reconcileStatefulSet(cluster *storagev2beta2.MultiRaftCluster) error {
+	log.Info("Reconcile raft protocol stateful set")
+	statefulSet := &appsv1.StatefulSet{}
+	name := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name,
+	}
+	err := r.client.Get(context.TODO(), name, statefulSet)
+	if err != nil && k8serrors.IsNotFound(err) {
+		err = r.addStatefulSet(cluster)
+	}
+	return err
+}
+
+func (r *MultiRaftClusterReconciler) addStatefulSet(cluster *storagev2beta2.MultiRaftCluster) error {
+	log.Info("Creating raft replicas", "Name", cluster.Name, "Namespace", cluster.Namespace)
+
+	image := getImage(cluster)
+	pullPolicy := cluster.Spec.GroupTemplate.Spec.ImagePullPolicy
+	if pullPolicy == "" {
+		pullPolicy = corev1.PullIfNotPresent
+	}
+
+	volumes := []corev1.Volume{
+		{
+			Name: configVolume,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: cluster.Name,
+					},
+				},
+			},
+		},
+	}
+
+	var volumeClaimTemplates []corev1.PersistentVolumeClaim
+
+	dataVolumeName := dataVolume
+	if cluster.Spec.GroupTemplate.Spec.VolumeClaimTemplate != nil {
+		pvc := cluster.Spec.GroupTemplate.Spec.VolumeClaimTemplate
+		if pvc.Name == "" {
+			pvc.Name = dataVolume
+		} else {
+			dataVolumeName = pvc.Name
+		}
+		volumeClaimTemplates = append(volumeClaimTemplates, *pvc)
+	} else {
+		volumes = append(volumes, corev1.Volume{
+			Name: dataVolume,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
+	}
+
+	set := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+			Labels:    newClusterLabels(cluster),
+		},
+		Spec: appsv1.StatefulSetSpec{
+			ServiceName: getClusterHeadlessServiceName(cluster),
+			Replicas:    &cluster.Spec.Replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: newClusterLabels(cluster),
+			},
+			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
+			},
+			PodManagementPolicy: appsv1.ParallelPodManagement,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: newClusterLabels(cluster),
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            "raft",
+							Image:           image,
+							ImagePullPolicy: pullPolicy,
+							Env: []corev1.EnvVar{
+								{
+									Name: "NODE_ID",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.name",
+										},
+									},
+								},
+							},
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "api",
+									ContainerPort: apiPort,
+								},
+								{
+									Name:          "protocol",
+									ContainerPort: protocolPort,
+								},
+							},
+							Args: []string{
+								"$(NODE_ID)",
+								fmt.Sprintf("%s/%s", configPath, clusterConfigFile),
+								fmt.Sprintf("%s/%s", configPath, protocolConfigFile),
+							},
+							ReadinessProbe: &corev1.Probe{
+								Handler: corev1.Handler{
+									Exec: &corev1.ExecAction{
+										Command: []string{"stat", "/tmp/atomix-ready"},
+									},
+								},
+								InitialDelaySeconds: 5,
+								TimeoutSeconds:      10,
+								FailureThreshold:    12,
+							},
+							LivenessProbe: &corev1.Probe{
+								Handler: corev1.Handler{
+									TCPSocket: &corev1.TCPSocketAction{
+										Port: intstr.IntOrString{Type: intstr.Int, IntVal: probePort},
+									},
+								},
+								InitialDelaySeconds: 60,
+								TimeoutSeconds:      10,
+							},
+							SecurityContext: cluster.Spec.GroupTemplate.Spec.SecurityContext,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      dataVolumeName,
+									MountPath: dataPath,
+								},
+								{
+									Name:      configVolume,
+									MountPath: configPath,
+								},
+							},
+						},
+					},
+					Affinity: &corev1.Affinity{
+						PodAntiAffinity: &corev1.PodAntiAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+								{
+									Weight: 1,
+									PodAffinityTerm: corev1.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: newClusterLabels(cluster),
+										},
+										Namespaces:  []string{cluster.Namespace},
+										TopologyKey: "kubernetes.io/hostname",
+									},
+								},
+							},
+						},
+					},
+					ImagePullSecrets: cluster.Spec.GroupTemplate.Spec.ImagePullSecrets,
+					Volumes:          volumes,
+				},
+			},
+			VolumeClaimTemplates: volumeClaimTemplates,
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, set, r.scheme); err != nil {
+		return err
+	}
+	return r.client.Create(context.TODO(), set)
+}
+
+func (r *MultiRaftClusterReconciler) reconcileService(cluster *storagev2beta2.MultiRaftCluster) error {
+	log.Info("Reconcile raft protocol headless service")
+	service := &corev1.Service{}
+	name := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      getClusterHeadlessServiceName(cluster),
+	}
+	err := r.client.Get(context.TODO(), name, service)
+	if err != nil && k8serrors.IsNotFound(err) {
+		err = r.addService(cluster)
+	}
+	return err
+}
+
+func (r *MultiRaftClusterReconciler) addService(cluster *storagev2beta2.MultiRaftCluster) error {
+	log.Info("Creating headless raft service", "Name", cluster.Name, "Namespace", cluster.Namespace)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      getClusterHeadlessServiceName(cluster),
+			Namespace: cluster.Namespace,
+			Labels:    newClusterLabels(cluster),
+			Annotations: map[string]string{
+				"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name: "api",
+					Port: apiPort,
+				},
+				{
+					Name: "protocol",
+					Port: protocolPort,
+				},
+			},
+			PublishNotReadyAddresses: true,
+			ClusterIP:                "None",
+			Selector:                 newClusterLabels(cluster),
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, service, r.scheme); err != nil {
+		return err
+	}
+	return r.client.Create(context.TODO(), service)
+}
+
 var _ reconcile.Reconciler = (*MultiRaftClusterReconciler)(nil)
+
+func getNumPartitions(cluster *storagev2beta2.MultiRaftCluster) int {
+	if cluster.Spec.Groups == 0 {
+		return 1
+	}
+	return int(cluster.Spec.Groups)
+}
+
+func getNumReplicas(cluster *storagev2beta2.MultiRaftCluster) int {
+	if cluster.Spec.Replicas == 0 {
+		return 1
+	}
+	return int(cluster.Spec.Replicas)
+}
+
+func getNumMembers(cluster *storagev2beta2.MultiRaftCluster) int {
+	if cluster.Spec.GroupTemplate.Spec.Members == nil {
+		return getNumReplicas(cluster)
+	}
+	return int(*cluster.Spec.GroupTemplate.Spec.Members)
+}
+
+func getNumROMembers(cluster *storagev2beta2.MultiRaftCluster) int {
+	if cluster.Spec.GroupTemplate.Spec.ReadOnlyMembers == nil {
+		return 0
+	}
+	return int(*cluster.Spec.GroupTemplate.Spec.ReadOnlyMembers)
+}
+
+// getClusterResourceName returns the given resource name for the given cluster
+func getClusterResourceName(cluster *storagev2beta2.MultiRaftCluster, resource string) string {
+	return fmt.Sprintf("%s-%s", cluster.Name, resource)
+}
+
+// getPartitionName returns the partition name
+func getPartitionName(cluster *storagev2beta2.MultiRaftCluster, partitionID int) string {
+	return fmt.Sprintf("%s-%d", cluster.Name, partitionID)
+}
+
+// getMemberName returns the member name
+func getMemberName(cluster *storagev2beta2.MultiRaftCluster, partitionID int, podID int) string {
+	return fmt.Sprintf("%s-%d", getPartitionName(cluster, partitionID), podID)
+}
+
+// getClusterHeadlessServiceName returns the headless service name for the given cluster
+func getClusterHeadlessServiceName(cluster *storagev2beta2.MultiRaftCluster) string {
+	return getClusterResourceName(cluster, headlessServiceSuffix)
+}
+
+// getPodName returns the name of the pod for the given pod ID
+func getPodName(cluster *storagev2beta2.MultiRaftCluster, podID int) string {
+	return fmt.Sprintf("%s-%d", cluster.Name, podID)
+}
+
+// getPodDNSName returns the fully qualified DNS name for the given pod ID
+func getPodDNSName(cluster *storagev2beta2.MultiRaftCluster, podID int) string {
+	return fmt.Sprintf("%s-%d.%s.%s", cluster.Name, podID, getClusterHeadlessServiceName(cluster), cluster.Namespace)
+}
+
+// newClusterLabels returns the labels for the given cluster
+func newClusterLabels(cluster *storagev2beta2.MultiRaftCluster) map[string]string {
+	labels := make(map[string]string)
+	for key, value := range cluster.Labels {
+		labels[key] = value
+	}
+	labels[appLabel] = appAtomix
+	labels[clusterLabel] = cluster.Name
+	return labels
+}
+
+func getImage(cluster *storagev2beta2.MultiRaftCluster) string {
+	if cluster.Spec.GroupTemplate.Spec.Image != "" {
+		return cluster.Spec.GroupTemplate.Spec.Image
+	}
+	return getDefaultImage()
+}
+
+func getDefaultImage() string {
+	image := os.Getenv(defaultImageEnv)
+	if image == "" {
+		image = defaultImage
+	}
+	return image
+}

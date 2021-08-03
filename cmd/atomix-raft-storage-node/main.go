@@ -24,10 +24,8 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/counter"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/election"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/indexedmap"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/leader"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/list"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/lock"
-	logprimitive "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/log"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/map"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/set"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/value"
@@ -73,8 +71,6 @@ func main() {
 	election.RegisterService(node)
 	indexedmap.RegisterService(node)
 	lock.RegisterService(node)
-	logprimitive.RegisterService(node)
-	leader.RegisterService(node)
 	list.RegisterService(node)
 	_map.RegisterService(node)
 	set.RegisterService(node)

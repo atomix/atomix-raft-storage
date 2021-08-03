@@ -168,9 +168,7 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 
 	// Create a listener to wait for a leader to be elected
 	eventCh := make(chan RaftEvent)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	p.watch(ctx, eventCh)
+	p.watch(context.Background(), eventCh)
 
 	rtt := uint64(250 * time.Millisecond)
 	if p.config.HeartbeatPeriod != nil {
@@ -207,6 +205,25 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 	}
 
 	for _, partition := range c.Partitions() {
+		isMember, readOnly := false, false
+		for _, r := range partition.Replicas() {
+			if r.ID == member.ID {
+				isMember = true
+				break
+			}
+		}
+		for _, r := range partition.ReadReplicas() {
+			if r.ID == member.ID {
+				isMember = true
+				readOnly = true
+				break
+			}
+		}
+
+		if !isMember {
+			continue
+		}
+
 		config := raftconfig.Config{
 			NodeID:             nodeID,
 			ClusterID:          uint64(partition.ID()),
@@ -215,7 +232,7 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 			CheckQuorum:        true,
 			SnapshotEntries:    p.config.SnapshotEntryThreshold,
 			CompactionOverhead: p.config.CompactionRetainEntries,
-			IsObserver:         member.ReadOnly,
+			IsObserver:         readOnly,
 		}
 
 		server := newServer(uint64(partition.ID()), memberAddresses, node, config, fsmFactory)
@@ -229,7 +246,7 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 
 	startedCh := make(chan struct{})
 	go func() {
-		startedPartitions := make(map[uint64]bool)
+		startedPartitions := make(map[uint32]bool)
 		started := false
 		for event := range eventCh {
 			if leader, ok := event.Event.(*RaftEvent_LeaderUpdated); ok &&
@@ -239,6 +256,8 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 					close(startedCh)
 					started = true
 				}
+				partition := p.clients[protocol.PartitionID(leader.LeaderUpdated.Partition)]
+				partition.updateConfig(leader.LeaderUpdated.Leader)
 			}
 		}
 	}()

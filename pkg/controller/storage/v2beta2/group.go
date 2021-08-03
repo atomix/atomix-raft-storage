@@ -124,7 +124,7 @@ func (r *RaftGroupReconciler) reconcileMembers(cluster *storagev2beta2.MultiRaft
 		replicas = int(*group.Spec.Members)
 	}
 	for i := 0; i < replicas; i++ {
-		if ok, err := r.reconcileMember(group, i, false); err != nil {
+		if ok, err := r.reconcileMember(cluster, group, i, false); err != nil {
 			return false, err
 		} else if ok {
 			return true, nil
@@ -136,7 +136,7 @@ func (r *RaftGroupReconciler) reconcileMembers(cluster *storagev2beta2.MultiRaft
 		readReplicas = int(*group.Spec.ReadOnlyMembers)
 	}
 	for i := 0; i < readReplicas; i++ {
-		if ok, err := r.reconcileMember(group, replicas+i, true); err != nil {
+		if ok, err := r.reconcileMember(cluster, group, replicas+i, true); err != nil {
 			return false, err
 		} else if ok {
 			return true, nil
@@ -145,7 +145,7 @@ func (r *RaftGroupReconciler) reconcileMembers(cluster *storagev2beta2.MultiRaft
 	return false, nil
 }
 
-func (r *RaftGroupReconciler) reconcileMember(group *storagev2beta2.RaftGroup, memberID int, readOnly bool) (bool, error) {
+func (r *RaftGroupReconciler) reconcileMember(cluster *storagev2beta2.MultiRaftCluster, group *storagev2beta2.RaftGroup, memberID int, readOnly bool) (bool, error) {
 	member := &storagev2beta2.RaftMember{}
 	memberName := types.NamespacedName{
 		Namespace: group.Namespace,
@@ -160,6 +160,10 @@ func (r *RaftGroupReconciler) reconcileMember(group *storagev2beta2.RaftGroup, m
 				Namespace: memberName.Namespace,
 				Name:      memberName.Name,
 				Labels:    group.Labels,
+			},
+			Spec: storagev2beta2.RaftMemberSpec{
+				PodName:  fmt.Sprintf("%s-%d", cluster.Name, ((getNumMembers(cluster)*int(group.Spec.GroupID))+memberID)%getNumReplicas(cluster)),
+				ReadOnly: readOnly,
 			},
 		}
 		if err := controllerutil.SetControllerReference(group, member, r.scheme); err != nil {
