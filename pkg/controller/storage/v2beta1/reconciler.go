@@ -45,22 +45,13 @@ func addRaftProtocolController(mgr manager.Manager) error {
 	}
 
 	// Create a new controller
-	controller, err := controller.New(mgr.GetScheme().Name(), mgr, options)
+	controller, err := controller.New("atomix-raft-protocol-v2beta1", mgr, options)
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to the storage resource and enqueue Clusters that reference it
 	err = controller.Watch(&source.Kind{Type: &storagev2beta1.MultiRaftProtocol{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to secondary resource StatefulSet
-	err = controller.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
-		OwnerType:    &storagev2beta1.MultiRaftProtocol{},
-		IsController: true,
-	})
 	if err != nil {
 		return err
 	}

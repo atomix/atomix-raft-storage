@@ -51,7 +51,7 @@ func addMultiRaftProtocolController(mgr manager.Manager) error {
 	}
 
 	// Create a new controller
-	controller, err := controller.New(mgr.GetScheme().Name(), mgr, options)
+	controller, err := controller.New("atomix-raft-protocol-v2beta2", mgr, options)
 	if err != nil {
 		return err
 	}

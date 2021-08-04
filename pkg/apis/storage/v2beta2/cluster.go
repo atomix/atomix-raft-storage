@@ -31,8 +31,8 @@ type MultiRaftClusterSpec struct {
 	Replicas int32 `json:"replicas,omitempty"`
 
 	// Groups is the number of groups
-	Groups int32 `json:"partitions,omitempty"`
-	GroupTemplate RaftGroupTemplateSpec `json:"groupTemplate,omitempty"`
+	Groups int32 `json:"groups,omitempty"`
+	GroupTemplate RaftGroupTemplateSpec `json:"template,omitempty"`
 }
 
 type RaftGroupTemplateSpec struct {

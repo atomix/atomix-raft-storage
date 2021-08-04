@@ -287,7 +287,7 @@ spec:
     - raftcluster
   scope: Namespaced
   versions:
-  - name: v2beta1
+  - name: v2beta2
     served: true
     storage: true
     subresources:
@@ -503,7 +503,7 @@ spec:
     singular: raftgroup
   scope: Namespaced
   versions:
-  - name: v2beta1
+  - name: v2beta2
     served: true
     storage: true
     subresources:

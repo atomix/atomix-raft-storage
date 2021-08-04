@@ -53,22 +53,13 @@ func addRaftMemberController(mgr manager.Manager) error {
 	}
 
 	// Create a new controller
-	controller, err := controller.New(mgr.GetScheme().Name(), mgr, options)
+	controller, err := controller.New("atomix-raft-member-v2beta2", mgr, options)
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to the storage resource and enqueue RaftMembers that reference it
 	err = controller.Watch(&source.Kind{Type: &storagev2beta2.RaftMember{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to secondary resource Pod
-	err = controller.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
-		OwnerType:    &storagev2beta2.RaftMember{},
-		IsController: false,
-	})
 	if err != nil {
 		return err
 	}

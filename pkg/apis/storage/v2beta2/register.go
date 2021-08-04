@@ -14,7 +14,7 @@
 
 // NOTE: Boilerplate only.  Ignore this file.
 
-// Package v2beta1 contains API Schema definitions for the cloud v2beta1 API group
+// Package v2beta2 contains API Schema definitions for the cloud v2beta1 API group
 // +k8s:deepcopy-gen=package,register
 // +groupName=storage.atomix.io
 package v2beta2

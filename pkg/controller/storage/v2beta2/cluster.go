@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/utils/pointer"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -82,7 +83,7 @@ func addMultiRaftClusterController(mgr manager.Manager) error {
 	}
 
 	// Create a new controller
-	controller, err := controller.New(mgr.GetScheme().Name(), mgr, options)
+	controller, err := controller.New("atomix-raft-cluster-v2beta2", mgr, options)
 	if err != nil {
 		return err
 	}
@@ -343,7 +344,7 @@ func (r *MultiRaftClusterReconciler) addStatefulSet(cluster *storagev2beta2.Mult
 		},
 		Spec: appsv1.StatefulSetSpec{
 			ServiceName: getClusterHeadlessServiceName(cluster),
-			Replicas:    &cluster.Spec.Replicas,
+			Replicas:    pointer.Int32Ptr(int32(getNumReplicas(cluster))),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: newClusterLabels(cluster),
 			},
