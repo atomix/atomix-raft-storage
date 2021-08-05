@@ -161,7 +161,6 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 	p.replicas = replicas
 	p.mu.Unlock()
 
-	memberIDs := p.getMemberIDs()
 	memberAddresses := p.getAddresses()
 	nodeID := p.getNodeID(string(member.ID))
 
@@ -192,7 +191,7 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 	fsmFactory := func(clusterID, nodeID uint64) statemachine.IStateMachine {
 		streams := newStreamManager()
 		fsm := newStateMachine(c, protocol.PartitionID(clusterID), registry, streams)
-		client := newPartition(clusterID, nodeID, node, memberIDs, streams)
+		client := newPartition(p, clusterID, nodeID, node, streams)
 		p.mu.Lock()
 		p.clients[protocol.PartitionID(clusterID)] = client
 		p.mu.Unlock()

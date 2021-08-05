@@ -28,22 +28,23 @@ import (
 const clientTimeout = 30 * time.Second
 
 // newPartition returns a new Raft consensus partition client
-func newPartition(clusterID uint64, nodeID uint64, node *dragonboat.NodeHost, members map[uint64]string, streams *streamManager) *Partition {
+func newPartition(protocol *Protocol, clusterID uint64, nodeID uint64, node *dragonboat.NodeHost, streams *streamManager) *Partition {
 	return &Partition{
+		protocol:  protocol,
 		clusterID: clusterID,
 		nodeID:    nodeID,
 		node:      node,
-		members:   members,
 		streams:   streams,
+		listeners: make(map[int]chan<- rsm.PartitionConfig),
 	}
 }
 
 // Partition is a Raft partition
 type Partition struct {
+	protocol   *Protocol
 	clusterID  uint64
 	nodeID     uint64
 	node       *dragonboat.NodeHost
-	members    map[uint64]string
 	streams    *streamManager
 	config     rsm.PartitionConfig
 	listeners  map[int]chan<- rsm.PartitionConfig
@@ -83,11 +84,13 @@ func (c *Partition) updateConfig(leader string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	config := rsm.PartitionConfig{}
-	config.Leader = leader
-	config.Followers = make([]string, 0, len(c.members))
-	for _, member := range c.members {
-		if member != leader {
-			config.Followers = append(config.Followers, member)
+	leaderID := c.protocol.getNodeID(leader)
+	memberAddresses := c.protocol.getAddresses()
+	config.Leader = memberAddresses[leaderID]
+	config.Followers = make([]string, 0, len(memberAddresses))
+	for id, memberAddress := range memberAddresses {
+		if id != leaderID {
+			config.Followers = append(config.Followers, memberAddress)
 		}
 	}
 	sort.Slice(config.Followers, func(i, j int) bool {

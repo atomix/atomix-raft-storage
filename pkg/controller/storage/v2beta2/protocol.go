@@ -340,6 +340,8 @@ func (r *MultiRaftProtocolReconciler) getProtocolPartitions(cluster *storagev2be
 		}
 		partition := corev2beta1.PartitionStatus{
 			ID:           uint32(partitionID),
+			Host:         pointer.StringPtr(fmt.Sprintf("%s.%s", cluster.Name, cluster.Namespace)),
+			Port:         pointer.Int32Ptr(apiPort),
 			Replicas:     replicas,
 			ReadReplicas: roReplicas,
 			Ready:        partitionReady,

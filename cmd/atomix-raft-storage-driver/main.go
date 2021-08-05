@@ -39,7 +39,7 @@ import (
 )
 
 func main() {
-	logging.SetLevel(logging.InfoLevel)
+	logging.SetLevel(logging.DebugLevel)
 
 	address := os.Args[1]
 	parts := strings.Split(address, ":")

@@ -156,7 +156,15 @@ spec:
                     id:
                       type: integer
                       minimum: 1
+                    host:
+                      type: string
+                    port:
+                      type: integer
                     replicas:
+                      type: array
+                      items:
+                        type: string
+                    readReplicas:
                       type: array
                       items:
                         type: string

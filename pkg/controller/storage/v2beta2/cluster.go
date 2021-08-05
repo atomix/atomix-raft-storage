@@ -154,6 +154,11 @@ func (r *MultiRaftClusterReconciler) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
+	err = r.reconcileHeadlessService(cluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	ok, err = r.reconcileStatus(cluster)
 	if err != nil {
 		log.Error(err, "Reconcile Cluster")
@@ -476,11 +481,11 @@ func (r *MultiRaftClusterReconciler) addStatefulSet(cluster *storagev2beta2.Mult
 }
 
 func (r *MultiRaftClusterReconciler) reconcileService(cluster *storagev2beta2.MultiRaftCluster) error {
-	log.Info("Reconcile raft protocol headless service")
+	log.Info("Reconcile raft protocol service")
 	service := &corev1.Service{}
 	name := types.NamespacedName{
 		Namespace: cluster.Namespace,
-		Name:      getClusterHeadlessServiceName(cluster),
+		Name:      cluster.Name,
 	}
 	err := r.client.Get(context.TODO(), name, service)
 	if err != nil && k8serrors.IsNotFound(err) {
@@ -490,6 +495,50 @@ func (r *MultiRaftClusterReconciler) reconcileService(cluster *storagev2beta2.Mu
 }
 
 func (r *MultiRaftClusterReconciler) addService(cluster *storagev2beta2.MultiRaftCluster) error {
+	log.Info("Creating raft service", "Name", cluster.Name, "Namespace", cluster.Namespace)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+			Labels:    newClusterLabels(cluster),
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name: "api",
+					Port: apiPort,
+				},
+				{
+					Name: "protocol",
+					Port: protocolPort,
+				},
+			},
+			Selector: newClusterLabels(cluster),
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, service, r.scheme); err != nil {
+		return err
+	}
+	return r.client.Create(context.TODO(), service)
+}
+
+func (r *MultiRaftClusterReconciler) reconcileHeadlessService(cluster *storagev2beta2.MultiRaftCluster) error {
+	log.Info("Reconcile raft protocol headless service")
+	service := &corev1.Service{}
+	name := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      getClusterHeadlessServiceName(cluster),
+	}
+	err := r.client.Get(context.TODO(), name, service)
+	if err != nil && k8serrors.IsNotFound(err) {
+		err = r.addHeadlessService(cluster)
+	}
+	return err
+}
+
+func (r *MultiRaftClusterReconciler) addHeadlessService(cluster *storagev2beta2.MultiRaftCluster) error {
 	log.Info("Creating headless raft service", "Name", cluster.Name, "Namespace", cluster.Namespace)
 
 	service := &corev1.Service{
@@ -616,6 +665,8 @@ func (r *MultiRaftClusterReconciler) getProtocolPartitions(cluster *storagev2bet
 		}
 		partition := corev2beta1.PartitionStatus{
 			ID:           uint32(partitionID),
+			Host:         pointer.StringPtr(fmt.Sprintf("%s.%s", cluster.Name, cluster.Namespace)),
+			Port:         pointer.Int32Ptr(apiPort),
 			Replicas:     replicas,
 			ReadReplicas: roReplicas,
 			Ready:        partitionReady,
