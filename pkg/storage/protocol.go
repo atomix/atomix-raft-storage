@@ -58,6 +58,7 @@ type Protocol struct {
 	memberIDs       map[uint64]string
 	nodeIDs         map[string]uint64
 	memberAddresses map[uint64]string
+	apiAddresses    map[uint64]string
 	listener        *raftEventListener
 }
 
@@ -115,7 +116,7 @@ func (p *Protocol) getNodeID(id string) uint64 {
 	return p.getNodeIDs()[id]
 }
 
-func (p *Protocol) getAddresses() map[uint64]string {
+func (p *Protocol) getRaftAddresses() map[uint64]string {
 	p.mu.RLock()
 	memberAddresses := p.memberAddresses
 	p.mu.RUnlock()
@@ -136,8 +137,33 @@ func (p *Protocol) getAddresses() map[uint64]string {
 	return p.memberAddresses
 }
 
-func (p *Protocol) getAddress(id uint64) string {
-	return p.getAddresses()[id]
+func (p *Protocol) getRaftAddress(id uint64) string {
+	return p.getRaftAddresses()[id]
+}
+
+func (p *Protocol) getAPIAddresses() map[uint64]string {
+	p.mu.RLock()
+	apiAddresses := p.apiAddresses
+	p.mu.RUnlock()
+	if apiAddresses != nil {
+		return apiAddresses
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.apiAddresses != nil {
+		return p.apiAddresses
+	}
+
+	p.apiAddresses = make(map[uint64]string)
+	for i, replica := range p.replicas {
+		p.apiAddresses[uint64(i+1)] = fmt.Sprintf("%s:%d", replica.Host, replica.Port)
+	}
+	return p.apiAddresses
+}
+
+func (p *Protocol) getAPIAddress(id uint64) string {
+	return p.getAPIAddresses()[id]
 }
 
 // Start starts the Raft protocol
@@ -161,7 +187,7 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 	p.replicas = replicas
 	p.mu.Unlock()
 
-	memberAddresses := p.getAddresses()
+	memberAddresses := p.getRaftAddresses()
 	nodeID := p.getNodeID(string(member.ID))
 
 	// Create a listener to wait for a leader to be elected
@@ -181,7 +207,6 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 		RaftEventListener:   p.listener,
 		SystemEventListener: p.listener,
 	}
-	log.Infof("%s", nodeConfig)
 
 	node, err := dragonboat.NewNodeHost(nodeConfig)
 	if err != nil {

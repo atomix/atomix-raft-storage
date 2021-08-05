@@ -85,10 +85,10 @@ func (c *Partition) updateConfig(leader string) {
 	defer c.mu.Unlock()
 	config := rsm.PartitionConfig{}
 	leaderID := c.protocol.getNodeID(leader)
-	memberAddresses := c.protocol.getAddresses()
-	config.Leader = memberAddresses[leaderID]
-	config.Followers = make([]string, 0, len(memberAddresses))
-	for id, memberAddress := range memberAddresses {
+	apiAddresses := c.protocol.getAPIAddresses()
+	config.Leader = apiAddresses[leaderID]
+	config.Followers = make([]string, 0, len(apiAddresses))
+	for id, memberAddress := range apiAddresses {
 		if id != leaderID {
 			config.Followers = append(config.Followers, memberAddress)
 		}
