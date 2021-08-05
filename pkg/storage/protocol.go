@@ -27,7 +27,6 @@ import (
 	"github.com/lni/dragonboat/v3/statemachine"
 	"sort"
 	"sync"
-	"time"
 )
 
 const dataDir = "/var/lib/atomix/data"
@@ -170,7 +169,7 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 	eventCh := make(chan RaftEvent)
 	p.watch(context.Background(), eventCh)
 
-	rtt := uint64(250 * time.Millisecond)
+	var rtt uint64 = 250
 	if p.config.HeartbeatPeriod != nil {
 		rtt = uint64(p.config.HeartbeatPeriod.Milliseconds())
 	}
@@ -183,6 +182,7 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 		RaftEventListener:   p.listener,
 		SystemEventListener: p.listener,
 	}
+	log.Infof("%s", nodeConfig)
 
 	node, err := dragonboat.NewNodeHost(nodeConfig)
 	if err != nil {
@@ -220,10 +220,6 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 			}
 		}
 
-		if !isMember {
-			continue
-		}
-
 		config := raftconfig.Config{
 			NodeID:             nodeID,
 			ClusterID:          uint64(partition.ID()),
@@ -233,6 +229,7 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 			SnapshotEntries:    p.config.SnapshotEntryThreshold,
 			CompactionOverhead: p.config.CompactionRetainEntries,
 			IsObserver:         readOnly,
+			IsWitness:          !isMember,
 		}
 
 		server := newServer(uint64(partition.ID()), memberAddresses, node, config, fsmFactory)

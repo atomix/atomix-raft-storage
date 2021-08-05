@@ -63,6 +63,15 @@ func addRaftMemberController(mgr manager.Manager) error {
 	if err != nil {
 		return err
 	}
+
+	err = controller.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestsFromMapFunc{
+		ToRequests: &mapPodMember{
+			client: mgr.GetClient(),
+		},
+	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -100,6 +109,34 @@ func (r *RaftMemberReconciler) Reconcile(request reconcile.Request) (reconcile.R
 }
 
 func (r *RaftMemberReconciler) reconcileStatus(member *storagev2beta2.RaftMember) (bool, error) {
+	podName := types.NamespacedName{
+		Namespace: member.Namespace,
+		Name:      member.Spec.PodName,
+	}
+	pod := &corev1.Pod{}
+	if err := r.client.Get(context.TODO(), podName, pod); err != nil {
+		return false, err
+	}
+
+	state := storagev2beta2.RaftMemberReady
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady {
+			if condition.Status != corev1.ConditionTrue {
+				state = storagev2beta2.RaftMemberNotReady
+			}
+			break
+		}
+	}
+	log.Warnf("State for %s is %s", member.Name, state)
+
+	if member.Status.State == nil || *member.Status.State != state {
+		member.Status.State = &state
+		if err := r.client.Status().Update(context.TODO(), member); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
 	go r.startMonitoringPod(member)
 	return false, nil
 }
@@ -585,3 +622,26 @@ func (r *RaftMemberReconciler) updateMemberStatus(member *storagev2beta2.RaftMem
 }
 
 var _ reconcile.Reconciler = (*RaftMemberReconciler)(nil)
+
+type mapPodMember struct {
+	client client.Client
+}
+
+func (m *mapPodMember) Map(object handler.MapObject) []reconcile.Request {
+	members := &storagev2beta2.RaftMemberList{}
+	if err := m.client.List(context.TODO(), members, &client.ListOptions{Namespace: object.Meta.GetNamespace()}); err != nil {
+		return []reconcile.Request{}
+	}
+	requests := make([]reconcile.Request, 0, len(members.Items))
+	for _, member := range members.Items {
+		if member.Spec.PodName == object.Meta.GetName() {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: member.Namespace,
+					Name:      member.Name,
+				},
+			})
+		}
+	}
+	return requests
+}

@@ -19,7 +19,8 @@ import (
 	"encoding/json"
 	"fmt"
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
-	"github.com/golang/protobuf/jsonpb"
+	corev2beta1 "github.com/atomix/atomix-controller/pkg/apis/core/v2beta1"
+	"github.com/gogo/protobuf/jsonpb"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,6 +71,8 @@ const (
 )
 
 const monitoringPort = 5000
+
+const clusterDomainEnv = "CLUSTER_DOMAIN"
 
 func addMultiRaftClusterController(mgr manager.Manager) error {
 	options := controller.Options{
@@ -135,11 +138,34 @@ func (r *MultiRaftClusterReconciler) Reconcile(request reconcile.Request) (recon
 	} else if ok {
 		return reconcile.Result{}, nil
 	}
+
+	err = r.reconcileConfigMap(cluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	err = r.reconcileStatefulSet(cluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	err = r.reconcileService(cluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	ok, err = r.reconcileStatus(cluster)
+	if err != nil {
+		log.Error(err, "Reconcile Cluster")
+		return reconcile.Result{}, err
+	} else if ok {
+		return reconcile.Result{}, nil
+	}
 	return reconcile.Result{}, nil
 }
 
 func (r *MultiRaftClusterReconciler) reconcileGroups(cluster *storagev2beta2.MultiRaftCluster) (bool, error) {
-	for i := 1; i < int(cluster.Spec.Groups); i++ {
+	for i := 1; i <= getNumPartitions(cluster); i++ {
 		if ok, err := r.reconcileGroup(cluster, i); err != nil {
 			return false, err
 		} else if ok {
@@ -233,7 +259,7 @@ func newNodeConfigString(cluster *storagev2beta2.MultiRaftCluster) (string, erro
 	for i := 0; i < numReplicas; i++ {
 		replicas[i] = protocolapi.ProtocolReplica{
 			ID:      fmt.Sprintf("%s-%d", cluster.Name, i),
-			Host:    fmt.Sprintf("%s-%d.%s.%s", cluster.Name, i, getClusterHeadlessServiceName(cluster), cluster.Namespace),
+			Host:    getPodDNSName(cluster, i),
 			APIPort: apiPort,
 			ExtraPorts: map[string]int32{
 				protocolPortName: protocolPort,
@@ -498,6 +524,128 @@ func (r *MultiRaftClusterReconciler) addService(cluster *storagev2beta2.MultiRaf
 	return r.client.Create(context.TODO(), service)
 }
 
+func (r *MultiRaftClusterReconciler) reconcileStatus(cluster *storagev2beta2.MultiRaftCluster) (bool, error) {
+	replicas, err := r.getProtocolReplicas(cluster)
+	if err != nil {
+		return false, err
+	}
+
+	partitions, err := r.getProtocolPartitions(cluster)
+	if err != nil {
+		return false, err
+	}
+
+	state := storagev2beta2.MultiRaftClusterReady
+	for _, replica := range replicas {
+		if !replica.Ready {
+			state = storagev2beta2.MultiRaftClusterNotReady
+			break
+		}
+	}
+	for _, partition := range partitions {
+		if !partition.Ready {
+			state = storagev2beta2.MultiRaftClusterNotReady
+			break
+		}
+	}
+
+	if cluster.Status.State != state {
+		cluster.Status.State = state
+		if err := r.client.Status().Update(context.TODO(), cluster); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+func (r *MultiRaftClusterReconciler) getProtocolReplicas(cluster *storagev2beta2.MultiRaftCluster) ([]corev2beta1.ReplicaStatus, error) {
+	numReplicas := getNumReplicas(cluster)
+	replicas := make([]corev2beta1.ReplicaStatus, numReplicas)
+	for i := 0; i < numReplicas; i++ {
+		replicaReady, err := r.isReplicaReady(cluster, i)
+		if err != nil {
+			return nil, err
+		}
+		replica := corev2beta1.ReplicaStatus{
+			ID:   fmt.Sprintf("%s-%d", cluster.Name, i),
+			Host: pointer.StringPtr(getPodDNSName(cluster, i)),
+			Port: pointer.Int32Ptr(int32(apiPort)),
+			ExtraPorts: map[string]int32{
+				protocolPortName: protocolPort,
+			},
+			Ready: replicaReady,
+		}
+		replicas[i] = replica
+	}
+	return replicas, nil
+}
+
+func (r *MultiRaftClusterReconciler) getProtocolPartitions(cluster *storagev2beta2.MultiRaftCluster) ([]corev2beta1.PartitionStatus, error) {
+	numReplicas := getNumReplicas(cluster)
+	numPartitions := getNumPartitions(cluster)
+	partitions := make([]corev2beta1.PartitionStatus, numPartitions)
+	for i := 0; i < numPartitions; i++ {
+		partitionID := i + 1
+		partitionReady := true
+		numMembers := getNumMembers(cluster)
+		numROMembers := getNumROMembers(cluster)
+
+		replicas := make([]string, numMembers)
+		for j := 0; j < numMembers; j++ {
+			replicaID := (((numMembers + numROMembers) * partitionID) + j) % numReplicas
+			replicaReady, err := r.isReplicaReady(cluster, replicaID)
+			if err != nil {
+				return nil, err
+			} else if !replicaReady {
+				partitionReady = false
+			}
+			replicas[j] = fmt.Sprintf("%s-%d", cluster.Name, replicaID)
+		}
+
+		roReplicas := make([]string, numROMembers)
+		for j := 0; j < numROMembers; j++ {
+			replicaID := (((numMembers + numROMembers) * partitionID) + numMembers + j) % numReplicas
+			replicaReady, err := r.isReplicaReady(cluster, replicaID)
+			if err != nil {
+				return nil, err
+			} else if !replicaReady {
+				partitionReady = false
+			}
+			roReplicas[j] = fmt.Sprintf("%s-%d", cluster.Name, replicaID)
+		}
+		partition := corev2beta1.PartitionStatus{
+			ID:           uint32(partitionID),
+			Replicas:     replicas,
+			ReadReplicas: roReplicas,
+			Ready:        partitionReady,
+		}
+		partitions[i] = partition
+	}
+	return partitions, nil
+}
+
+func (r *MultiRaftClusterReconciler) isReplicaReady(cluster *storagev2beta2.MultiRaftCluster, replica int) (bool, error) {
+	podName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      fmt.Sprintf("%s-%d", cluster.Name, replica),
+	}
+	pod := &corev1.Pod{}
+	if err := r.client.Get(context.TODO(), podName, pod); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady {
+			return condition.Status == corev1.ConditionTrue, nil
+		}
+	}
+	return false, nil
+}
+
 var _ reconcile.Reconciler = (*MultiRaftClusterReconciler)(nil)
 
 func getNumPartitions(cluster *storagev2beta2.MultiRaftCluster) int {
@@ -555,7 +703,11 @@ func getPodName(cluster *storagev2beta2.MultiRaftCluster, podID int) string {
 
 // getPodDNSName returns the fully qualified DNS name for the given pod ID
 func getPodDNSName(cluster *storagev2beta2.MultiRaftCluster, podID int) string {
-	return fmt.Sprintf("%s-%d.%s.%s", cluster.Name, podID, getClusterHeadlessServiceName(cluster), cluster.Namespace)
+	domain := os.Getenv(clusterDomainEnv)
+	if domain == "" {
+		domain = "cluster.local"
+	}
+	return fmt.Sprintf("%s-%d.%s.%s.svc.%s", cluster.Name, podID, getClusterHeadlessServiceName(cluster), cluster.Namespace, domain)
 }
 
 // newClusterLabels returns the labels for the given cluster

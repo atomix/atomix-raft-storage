@@ -79,6 +79,7 @@ func (c *Partition) Followers() []string {
 }
 
 func (c *Partition) updateConfig(leader string) {
+	log.Infof("Updating leader for partition %d: %s", c.clusterID, leader)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	config := rsm.PartitionConfig{}

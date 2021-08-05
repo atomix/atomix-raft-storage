@@ -17,10 +17,13 @@ package v2beta2
 import (
 	"context"
 	"fmt"
+	corev2beta1 "github.com/atomix/atomix-controller/pkg/apis/core/v2beta1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -115,15 +118,19 @@ func (r *RaftGroupReconciler) Reconcile(request reconcile.Request) (reconcile.Re
 	} else if ok {
 		return reconcile.Result{}, nil
 	}
+
+	ok, err = r.reconcileStatus(cluster, group)
+	if err != nil {
+		log.Error(err, "Reconcile Cluster")
+		return reconcile.Result{}, err
+	} else if ok {
+		return reconcile.Result{}, nil
+	}
 	return reconcile.Result{}, nil
 }
 
 func (r *RaftGroupReconciler) reconcileMembers(cluster *storagev2beta2.MultiRaftCluster, group *storagev2beta2.RaftGroup) (bool, error) {
-	replicas := int(cluster.Spec.Replicas)
-	if group.Spec.Members != nil {
-		replicas = int(*group.Spec.Members)
-	}
-	for i := 0; i < replicas; i++ {
+	for i := 0; i < getNumMembers(cluster); i++ {
 		if ok, err := r.reconcileMember(cluster, group, i, false); err != nil {
 			return false, err
 		} else if ok {
@@ -131,12 +138,8 @@ func (r *RaftGroupReconciler) reconcileMembers(cluster *storagev2beta2.MultiRaft
 		}
 	}
 
-	readReplicas := 0
-	if group.Spec.ReadOnlyMembers != nil {
-		readReplicas = int(*group.Spec.ReadOnlyMembers)
-	}
-	for i := 0; i < readReplicas; i++ {
-		if ok, err := r.reconcileMember(cluster, group, replicas+i, true); err != nil {
+	for i := 0; i < getNumROMembers(cluster); i++ {
+		if ok, err := r.reconcileMember(cluster, group, getNumMembers(cluster)+i, true); err != nil {
 			return false, err
 		} else if ok {
 			return true, nil
@@ -173,6 +176,96 @@ func (r *RaftGroupReconciler) reconcileMember(cluster *storagev2beta2.MultiRaftC
 			return false, err
 		}
 		return true, nil
+	}
+	return false, nil
+}
+
+func (r *RaftGroupReconciler) reconcileStatus(cluster *storagev2beta2.MultiRaftCluster, group *storagev2beta2.RaftGroup) (bool, error) {
+	replicas, err := r.getReplicas(cluster, group)
+	if err != nil {
+		return false, err
+	}
+
+	state := storagev2beta2.RaftGroupReady
+	for _, replica := range replicas {
+		if !replica.Ready {
+			state = storagev2beta2.RaftGroupNotReady
+			break
+		}
+	}
+
+	if group.Status.State != state {
+		group.Status.State = state
+		if err := r.client.Status().Update(context.TODO(), group); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+func (r *RaftGroupReconciler) getReplicas(cluster *storagev2beta2.MultiRaftCluster, group *storagev2beta2.RaftGroup) ([]corev2beta1.ReplicaStatus, error) {
+	numReplicas := getNumReplicas(cluster)
+	partitionID := group.Spec.GroupID
+	numMembers := getNumMembers(cluster)
+	numROMembers := getNumROMembers(cluster)
+
+	replicas := make([]corev2beta1.ReplicaStatus, 0, numReplicas)
+	for i := 0; i < numMembers; i++ {
+		replicaID := (((numMembers + numROMembers) * int(partitionID)) + i) % numReplicas
+		replicaReady, err := r.isReplicaReady(cluster, replicaID)
+		if err != nil {
+			return nil, err
+		}
+		replica := corev2beta1.ReplicaStatus{
+			ID:   fmt.Sprintf("%s-%d", cluster.Name, replicaID),
+			Host: pointer.StringPtr(getPodDNSName(cluster, replicaID)),
+			Port: pointer.Int32Ptr(int32(apiPort)),
+			ExtraPorts: map[string]int32{
+				protocolPortName: protocolPort,
+			},
+			Ready: replicaReady,
+		}
+		replicas = append(replicas, replica)
+	}
+
+	for i := 0; i < numROMembers; i++ {
+		replicaID := (((numMembers + numROMembers) * int(partitionID)) + numMembers + i) % numReplicas
+		replicaReady, err := r.isReplicaReady(cluster, replicaID)
+		if err != nil {
+			return nil, err
+		}
+		replica := corev2beta1.ReplicaStatus{
+			ID:   fmt.Sprintf("%s-%d", cluster.Name, replicaID),
+			Host: pointer.StringPtr(getPodDNSName(cluster, replicaID)),
+			Port: pointer.Int32Ptr(int32(apiPort)),
+			ExtraPorts: map[string]int32{
+				protocolPortName: protocolPort,
+			},
+			Ready: replicaReady,
+		}
+		replicas = append(replicas, replica)
+	}
+	return replicas, nil
+}
+
+func (r *RaftGroupReconciler) isReplicaReady(cluster *storagev2beta2.MultiRaftCluster, replica int) (bool, error) {
+	podName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      fmt.Sprintf("%s-%d", cluster.Name, replica),
+	}
+	pod := &corev1.Pod{}
+	if err := r.client.Get(context.TODO(), podName, pod); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady {
+			return condition.Status == corev1.ConditionTrue, nil
+		}
 	}
 	return false, nil
 }

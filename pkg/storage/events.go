@@ -8,19 +8,19 @@ import (
 )
 
 func NewEventServer(protocol *Protocol) *EventServer {
-	ch := make(chan RaftEvent)
-	protocol.watch(context.Background(), ch)
 	return &EventServer{
-		ch: ch,
+		protocol: protocol,
 	}
 }
 
 type EventServer struct {
-	ch chan RaftEvent
+	protocol *Protocol
 }
 
 func (e *EventServer) Subscribe(request *SubscribeRequest, stream RaftEvents_SubscribeServer) error {
-	for event := range e.ch {
+	ch := make(chan RaftEvent)
+	e.protocol.watch(stream.Context(), ch)
+	for event := range ch {
 		err := stream.Send(&event)
 		if err != nil {
 			return err

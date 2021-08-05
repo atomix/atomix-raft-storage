@@ -293,7 +293,7 @@ func (r *MultiRaftProtocolReconciler) getProtocolReplicas(cluster *storagev2beta
 		}
 		replica := corev2beta1.ReplicaStatus{
 			ID:   fmt.Sprintf("%s-%d", cluster.Name, i),
-			Host: pointer.StringPtr(fmt.Sprintf("%s-%d.%s.%s", cluster.Name, i, getClusterHeadlessServiceName(cluster), cluster.Namespace)),
+			Host: pointer.StringPtr(getPodDNSName(cluster, i)),
 			Port: pointer.Int32Ptr(int32(apiPort)),
 			ExtraPorts: map[string]int32{
 				protocolPortName: protocolPort,
