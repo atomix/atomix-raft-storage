@@ -18,19 +18,26 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// RaftMemberState is a state constant for RaftMember
 type RaftMemberState string
 
 const (
+	// RaftMemberNotReady indicates a RaftMember is not yet ready
 	RaftMemberNotReady RaftMemberState = "NotReady"
-	RaftMemberReady    RaftMemberState = "Ready"
+	// RaftMemberReady indicates a RaftMember is ready
+	RaftMemberReady RaftMemberState = "Ready"
 )
 
+// RaftMemberRole is a constant for RaftMember representing the current role of the member
 type RaftMemberRole string
 
 const (
-	RaftLeader    RaftMemberRole = "Leader"
+	// RaftLeader is a RaftMemberRole indicating the RaftMember is currently the leader of the group
+	RaftLeader RaftMemberRole = "Leader"
+	// RaftCandidate is a RaftMemberRole indicating the RaftMember is currently a candidate
 	RaftCandidate RaftMemberRole = "Candidate"
-	RaftFollower  RaftMemberRole = "Follower"
+	// RaftFollower is a RaftMemberRole indicating the RaftMember is currently a follower
+	RaftFollower RaftMemberRole = "Follower"
 )
 
 // RaftMemberSpec specifies a RaftMemberSpec configuration

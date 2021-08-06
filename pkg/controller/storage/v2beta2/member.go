@@ -137,10 +137,16 @@ func (r *RaftMemberReconciler) reconcileStatus(member *storagev2beta2.RaftMember
 		return true, nil
 	}
 
-	go r.startMonitoringPod(member)
+	go func() {
+		err := r.startMonitoringPod(member)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 	return false, nil
 }
 
+// nolint:gocyclo
 func (r *RaftMemberReconciler) startMonitoringPod(member *storagev2beta2.RaftMember) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -182,7 +188,12 @@ func (r *RaftMemberReconciler) startMonitoringPod(member *storagev2beta2.RaftMem
 			r.mu.Lock()
 			delete(r.streams, member.Name)
 			r.mu.Unlock()
-			go r.startMonitoringPod(member)
+			go func() {
+				err := r.startMonitoringPod(member)
+				if err != nil {
+					log.Error(err)
+				}
+			}()
 		}()
 
 		group, err := r.getGroup(member)
@@ -454,6 +465,9 @@ func (r *RaftMemberReconciler) recordSnapshotReceived(memberName types.Namespace
 			LastUpdated:       &timestamp,
 		})
 	}, backoff.NewExponentialBackOff())
+	if err != nil {
+		log.Error(err)
+	}
 }
 
 func (r *RaftMemberReconciler) recordSnapshotRecovered(memberName types.NamespacedName, event *storage.SnapshotRecoveredEvent, timestamp metav1.Time) {
@@ -480,6 +494,9 @@ func (r *RaftMemberReconciler) recordSnapshotRecovered(memberName types.Namespac
 			LastUpdated:       &timestamp,
 		})
 	}, backoff.NewExponentialBackOff())
+	if err != nil {
+		log.Error(err)
+	}
 }
 
 func (r *RaftMemberReconciler) recordSnapshotCreated(memberName types.NamespacedName, event *storage.SnapshotCreatedEvent, timestamp metav1.Time) {
@@ -506,6 +523,9 @@ func (r *RaftMemberReconciler) recordSnapshotCreated(memberName types.Namespaced
 			LastUpdated:       &timestamp,
 		})
 	}, backoff.NewExponentialBackOff())
+	if err != nil {
+		log.Error(err)
+	}
 }
 
 func (r *RaftMemberReconciler) recordSnapshotCompacted(memberName types.NamespacedName, event *storage.SnapshotCompactedEvent, timestamp metav1.Time) {
@@ -532,6 +552,9 @@ func (r *RaftMemberReconciler) recordSnapshotCompacted(memberName types.Namespac
 			LastUpdated:       &timestamp,
 		})
 	}, backoff.NewExponentialBackOff())
+	if err != nil {
+		log.Error(err)
+	}
 }
 
 func (r *RaftMemberReconciler) recordLogCompacted(memberName types.NamespacedName, event *storage.LogCompactedEvent, timestamp metav1.Time) {

@@ -36,13 +36,13 @@ type streamManager struct {
 }
 
 // addStream adds a new stream
-func (r *streamManager) addStream(stream streams.WriteStream) (streamID, streams.WriteStream) {
+func (r *streamManager) addStream(stream streams.WriteStream) streamID {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.nextID++
 	streamID := r.nextID
 	r.streams[streamID] = stream
-	return streamID, stream
+	return streamID
 }
 
 // removeStream removes a stream by ID

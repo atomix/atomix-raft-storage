@@ -1,3 +1,17 @@
+// Copyright 2021-present Open Networking Foundation.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package storage
 
 import (
@@ -7,16 +21,19 @@ import (
 	"time"
 )
 
+// NewEventServer creates a new EventServer instance
 func NewEventServer(protocol *Protocol) *EventServer {
 	return &EventServer{
 		protocol: protocol,
 	}
 }
 
+// EventServer is a server for monitoring Raft cluster events
 type EventServer struct {
 	protocol *Protocol
 }
 
+// Subscribe subscribes to receive events from a partition
 func (e *EventServer) Subscribe(request *SubscribeRequest, stream RaftEvents_SubscribeServer) error {
 	ch := make(chan RaftEvent)
 	e.protocol.watch(stream.Context(), ch)

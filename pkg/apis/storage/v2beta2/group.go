@@ -19,11 +19,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// RaftGroupState is a state constant for RaftGroup
 type RaftGroupState string
 
 const (
+	// RaftGroupNotReady indicates a RaftGroup is not yet ready
 	RaftGroupNotReady RaftGroupState = "NotReady"
-	RaftGroupReady    RaftGroupState = "Ready"
+	// RaftGroupReady indicates a RaftGroup is ready
+	RaftGroupReady RaftGroupState = "Ready"
 )
 
 // RaftGroupSpec specifies a RaftGroupSpec configuration
@@ -54,6 +57,7 @@ type RaftGroupSpec struct {
 	VolumeClaimTemplate *corev1.PersistentVolumeClaim `json:"volumeClaimTemplate,omitempty"`
 }
 
+// RaftGroupConfig is the configuration of a Raft group
 type RaftGroupConfig struct {
 	HeartbeatPeriod    *metav1.Duration        `json:"heartbeatPeriod,omitempty"`
 	ElectionTimeout    *metav1.Duration        `json:"electionTimeout,omitempty"`
@@ -62,25 +66,33 @@ type RaftGroupConfig struct {
 	CompactionStrategy *RaftCompactionStrategy `json:"compactionStrategy,omitempty"`
 }
 
+// RaftSnapshotStrategyType is a snapshot strategy constant
 type RaftSnapshotStrategyType string
 
 const (
-	RaftSnapshotNone      RaftSnapshotStrategyType = "None"
+	// RaftSnapshotNone disables snapshots
+	RaftSnapshotNone RaftSnapshotStrategyType = "None"
+	// RaftSnapshotThreshold enables threshold-based snapshots
 	RaftSnapshotThreshold RaftSnapshotStrategyType = "Threshold"
 )
 
+// RaftSnapshotStrategy is a Raft snapshot strategy configuration
 type RaftSnapshotStrategy struct {
 	Type           RaftSnapshotStrategyType `json:"type,omitempty"`
 	EntryThreshold *int64                   `json:"entryThreshold,omitempty"`
 }
 
+// RaftCompactionStrategyType is a compaction strategy constant
 type RaftCompactionStrategyType string
 
 const (
+	// RaftCompactionNone disables log compaction
 	RaftCompactionNone RaftCompactionStrategyType = "None"
+	// RaftCompactionAuto enables automatic log compaction
 	RaftCompactionAuto RaftCompactionStrategyType = "Auto"
 )
 
+// RaftCompactionStrategy is a Raft compaction strategy configuration
 type RaftCompactionStrategy struct {
 	Type          RaftCompactionStrategyType `json:"type,omitempty"`
 	RetainEntries *int64                     `json:"retainEntries,omitempty"`

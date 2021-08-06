@@ -73,6 +73,7 @@ func (c *Partition) Leader() string {
 	return c.config.Leader
 }
 
+// Followers returns the current set of followers' addresses for this partition
 func (c *Partition) Followers() []string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -103,6 +104,7 @@ func (c *Partition) updateConfig(leader string) {
 	}
 }
 
+// WatchConfig watches the partition configuration for changes
 func (c *Partition) WatchConfig(ctx context.Context, ch chan<- rsm.PartitionConfig) error {
 	c.listenerID++
 	id := c.listenerID
@@ -124,7 +126,7 @@ func (c *Partition) WatchConfig(ctx context.Context, ch chan<- rsm.PartitionConf
 
 // SyncCommand executes a state machine command on the partition
 func (c *Partition) SyncCommand(ctx context.Context, input []byte, stream streams.WriteStream) error {
-	streamID, stream := c.streams.addStream(stream)
+	streamID := c.streams.addStream(stream)
 	defer c.streams.removeStream(streamID)
 	entry := &Entry{
 		Value:    input,
@@ -162,8 +164,6 @@ func (c *Partition) StaleQuery(ctx context.Context, input []byte, stream streams
 		value:  input,
 		stream: stream,
 	}
-	ctx, cancel := context.WithTimeout(ctx, clientTimeout)
-	defer cancel()
 	if _, err := c.node.StaleRead(c.clusterID, query); err != nil {
 		return err
 	}

@@ -18,11 +18,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// MultiRaftClusterState is a state constant for MultiRaftCluster
 type MultiRaftClusterState string
 
 const (
+	// MultiRaftClusterNotReady indicates a MultiRaftCluster is not yet ready
 	MultiRaftClusterNotReady MultiRaftClusterState = "NotReady"
-	MultiRaftClusterReady    MultiRaftClusterState = "Ready"
+	// MultiRaftClusterReady indicates a MultiRaftCluster is ready
+	MultiRaftClusterReady MultiRaftClusterState = "Ready"
 )
 
 // MultiRaftClusterSpec specifies a MultiRaftClusterSpec configuration
@@ -31,10 +34,11 @@ type MultiRaftClusterSpec struct {
 	Replicas int32 `json:"replicas,omitempty"`
 
 	// Groups is the number of groups
-	Groups int32 `json:"groups,omitempty"`
+	Groups        int32                 `json:"groups,omitempty"`
 	GroupTemplate RaftGroupTemplateSpec `json:"template,omitempty"`
 }
 
+// RaftGroupTemplateSpec specifies a RaftGroup template
 type RaftGroupTemplateSpec struct {
 	Spec RaftGroupSpec `json:"spec,omitempty"`
 }

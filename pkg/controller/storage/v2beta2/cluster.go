@@ -35,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"sync"
 	"time"
 
 	storagev2beta2 "github.com/atomix/atomix-raft-storage/pkg/apis/storage/v2beta2"
@@ -77,10 +76,9 @@ const clusterDomainEnv = "CLUSTER_DOMAIN"
 func addMultiRaftClusterController(mgr manager.Manager) error {
 	options := controller.Options{
 		Reconciler: &MultiRaftClusterReconciler{
-			client:  mgr.GetClient(),
-			scheme:  mgr.GetScheme(),
-			events:  mgr.GetEventRecorderFor("atomix-raft-storage"),
-			streams: make(map[string]func()),
+			client: mgr.GetClient(),
+			scheme: mgr.GetScheme(),
+			events: mgr.GetEventRecorderFor("atomix-raft-storage"),
 		},
 		RateLimiter: workqueue.NewItemExponentialFailureRateLimiter(time.Millisecond*10, time.Second*5),
 	}
@@ -110,11 +108,9 @@ func addMultiRaftClusterController(mgr manager.Manager) error {
 
 // MultiRaftClusterReconciler reconciles a MultiRaftCluster object
 type MultiRaftClusterReconciler struct {
-	client  client.Client
-	scheme  *runtime.Scheme
-	events  record.EventRecorder
-	streams map[string]func()
-	mu      sync.Mutex
+	client client.Client
+	scheme *runtime.Scheme
+	events record.EventRecorder
 }
 
 // Reconcile reads that state of the cluster for a Cluster object and makes changes based on the state read
@@ -732,24 +728,9 @@ func getClusterResourceName(cluster *storagev2beta2.MultiRaftCluster, resource s
 	return fmt.Sprintf("%s-%s", cluster.Name, resource)
 }
 
-// getPartitionName returns the partition name
-func getPartitionName(cluster *storagev2beta2.MultiRaftCluster, partitionID int) string {
-	return fmt.Sprintf("%s-%d", cluster.Name, partitionID)
-}
-
-// getMemberName returns the member name
-func getMemberName(cluster *storagev2beta2.MultiRaftCluster, partitionID int, podID int) string {
-	return fmt.Sprintf("%s-%d", getPartitionName(cluster, partitionID), podID)
-}
-
 // getClusterHeadlessServiceName returns the headless service name for the given cluster
 func getClusterHeadlessServiceName(cluster *storagev2beta2.MultiRaftCluster) string {
 	return getClusterResourceName(cluster, headlessServiceSuffix)
-}
-
-// getPodName returns the name of the pod for the given pod ID
-func getPodName(cluster *storagev2beta2.MultiRaftCluster, podID int) string {
-	return fmt.Sprintf("%s-%d", cluster.Name, podID)
 }
 
 // getPodDNSName returns the fully qualified DNS name for the given pod ID

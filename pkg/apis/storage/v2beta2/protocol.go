@@ -19,11 +19,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// MultiRaftProtocolState is a state constant for MultiRaftProtocol
 type MultiRaftProtocolState string
 
 const (
+	// MultiRaftProtocolNotReady indicates a MultiRaftProtocol is not yet ready
 	MultiRaftProtocolNotReady MultiRaftProtocolState = "NotReady"
-	MultiRaftProtocolReady    MultiRaftProtocolState = "Ready"
+	// MultiRaftProtocolReady indicates a MultiRaftProtocol is ready
+	MultiRaftProtocolReady MultiRaftProtocolState = "Ready"
 )
 
 // MultiRaftProtocolSpec specifies a MultiRaftProtocol configuration

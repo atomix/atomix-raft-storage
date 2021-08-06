@@ -137,10 +137,6 @@ func (p *Protocol) getRaftAddresses() map[uint64]string {
 	return p.memberAddresses
 }
 
-func (p *Protocol) getRaftAddress(id uint64) string {
-	return p.getRaftAddresses()[id]
-}
-
 func (p *Protocol) getAPIAddresses() map[uint64]string {
 	p.mu.RLock()
 	apiAddresses := p.apiAddresses
@@ -160,10 +156,6 @@ func (p *Protocol) getAPIAddresses() map[uint64]string {
 		p.apiAddresses[uint64(i+1)] = fmt.Sprintf("%s:%d", replica.Host, replica.Port)
 	}
 	return p.apiAddresses
-}
-
-func (p *Protocol) getAPIAddress(id uint64) string {
-	return p.getAPIAddresses()[id]
 }
 
 // Start starts the Raft protocol

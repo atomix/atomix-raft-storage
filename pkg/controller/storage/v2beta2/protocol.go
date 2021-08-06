@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"sync"
 	"time"
 
 	storagev2beta2 "github.com/atomix/atomix-raft-storage/pkg/apis/storage/v2beta2"
@@ -42,10 +41,9 @@ import (
 func addMultiRaftProtocolController(mgr manager.Manager) error {
 	options := controller.Options{
 		Reconciler: &MultiRaftProtocolReconciler{
-			client:  mgr.GetClient(),
-			scheme:  mgr.GetScheme(),
-			events:  mgr.GetEventRecorderFor("atomix-raft-storage"),
-			streams: make(map[string]func()),
+			client: mgr.GetClient(),
+			scheme: mgr.GetScheme(),
+			events: mgr.GetEventRecorderFor("atomix-raft-storage"),
 		},
 		RateLimiter: workqueue.NewItemExponentialFailureRateLimiter(time.Millisecond*10, time.Second*5),
 	}
@@ -75,11 +73,9 @@ func addMultiRaftProtocolController(mgr manager.Manager) error {
 
 // MultiRaftProtocolReconciler reconciles a MultiRaftProtocol object
 type MultiRaftProtocolReconciler struct {
-	client  client.Client
-	scheme  *runtime.Scheme
-	events  record.EventRecorder
-	streams map[string]func()
-	mu      sync.Mutex
+	client client.Client
+	scheme *runtime.Scheme
+	events record.EventRecorder
 }
 
 // Reconcile reads that state of the cluster for a Cluster object and makes changes based on the state read
