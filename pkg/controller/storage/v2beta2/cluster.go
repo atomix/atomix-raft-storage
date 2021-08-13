@@ -20,6 +20,7 @@ import (
 	"fmt"
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	corev2beta1 "github.com/atomix/atomix-controller/pkg/apis/core/v2beta1"
+	raftconfig "github.com/atomix/atomix-raft-storage/pkg/storage/config"
 	"github.com/gogo/protobuf/jsonpb"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -186,15 +187,16 @@ func (r *MultiRaftClusterReconciler) reconcileGroup(cluster *storagev2beta2.Mult
 		if !k8serrors.IsNotFound(err) {
 			return false, err
 		}
-		groupSpec := cluster.Spec.GroupTemplate.Spec
-		groupSpec.GroupID = int32(groupID)
 		group = &storagev2beta2.RaftGroup{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: groupName.Namespace,
 				Name:      groupName.Name,
 				Labels:    cluster.Labels,
 			},
-			Spec: groupSpec,
+			Spec: storagev2beta2.RaftGroupSpec{
+				RaftConfig: cluster.Spec.Raft,
+				GroupID:    int32(groupID),
+			},
 		}
 		if err := controllerutil.SetControllerReference(cluster, group, r.scheme); err != nil {
 			return false, err
@@ -223,14 +225,13 @@ func (r *MultiRaftClusterReconciler) reconcileConfigMap(cluster *storagev2beta2.
 
 func (r *MultiRaftClusterReconciler) addConfigMap(cluster *storagev2beta2.MultiRaftCluster) error {
 	log.Info("Creating raft ConfigMap", "Name", cluster.Name, "Namespace", cluster.Namespace)
-	var config interface{}
 
 	clusterConfig, err := newNodeConfigString(cluster)
 	if err != nil {
 		return err
 	}
 
-	protocolConfig, err := newProtocolConfigString(config)
+	protocolConfig, err := newProtocolConfigString(cluster)
 	if err != nil {
 		return err
 	}
@@ -299,8 +300,38 @@ func newNodeConfigString(cluster *storagev2beta2.MultiRaftCluster) (string, erro
 }
 
 // newProtocolConfigString creates a protocol configuration string for the given cluster and protocol
-func newProtocolConfigString(config interface{}) (string, error) {
-	bytes, err := json.Marshal(config)
+func newProtocolConfigString(cluster *storagev2beta2.MultiRaftCluster) (string, error) {
+	config := raftconfig.ProtocolConfig{}
+	sessionTimeout := cluster.Spec.Raft.SessionTimeout
+	if sessionTimeout != nil {
+		config.SessionTimeout = &sessionTimeout.Duration
+	}
+
+	electionTimeout := cluster.Spec.Raft.ElectionTimeout
+	if electionTimeout != nil {
+		config.ElectionTimeout = &electionTimeout.Duration
+	}
+
+	heartbeatPeriod := cluster.Spec.Raft.HeartbeatPeriod
+	if heartbeatPeriod != nil {
+		config.HeartbeatPeriod = &heartbeatPeriod.Duration
+	}
+
+	entryThreshold := cluster.Spec.Raft.SnapshotEntryThreshold
+	if entryThreshold != nil {
+		config.SnapshotEntryThreshold = uint64(*entryThreshold)
+	} else {
+		config.SnapshotEntryThreshold = 10000
+	}
+
+	retainEntries := cluster.Spec.Raft.CompactionRetainEntries
+	if retainEntries != nil {
+		config.CompactionRetainEntries = uint64(*retainEntries)
+	} else {
+		config.CompactionRetainEntries = 1000
+	}
+
+	bytes, err := json.Marshal(&config)
 	if err != nil {
 		return "", err
 	}
@@ -325,7 +356,7 @@ func (r *MultiRaftClusterReconciler) addStatefulSet(cluster *storagev2beta2.Mult
 	log.Info("Creating raft replicas", "Name", cluster.Name, "Namespace", cluster.Namespace)
 
 	image := getImage(cluster)
-	pullPolicy := cluster.Spec.GroupTemplate.Spec.ImagePullPolicy
+	pullPolicy := cluster.Spec.ImagePullPolicy
 	if pullPolicy == "" {
 		pullPolicy = corev1.PullIfNotPresent
 	}
@@ -346,8 +377,8 @@ func (r *MultiRaftClusterReconciler) addStatefulSet(cluster *storagev2beta2.Mult
 	var volumeClaimTemplates []corev1.PersistentVolumeClaim
 
 	dataVolumeName := dataVolume
-	if cluster.Spec.GroupTemplate.Spec.VolumeClaimTemplate != nil {
-		pvc := cluster.Spec.GroupTemplate.Spec.VolumeClaimTemplate
+	if cluster.Spec.VolumeClaimTemplate != nil {
+		pvc := cluster.Spec.VolumeClaimTemplate
 		if pvc.Name == "" {
 			pvc.Name = dataVolume
 		} else {
@@ -433,7 +464,7 @@ func (r *MultiRaftClusterReconciler) addStatefulSet(cluster *storagev2beta2.Mult
 								InitialDelaySeconds: 60,
 								TimeoutSeconds:      10,
 							},
-							SecurityContext: cluster.Spec.GroupTemplate.Spec.SecurityContext,
+							SecurityContext: cluster.Spec.SecurityContext,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      dataVolumeName,
@@ -462,7 +493,7 @@ func (r *MultiRaftClusterReconciler) addStatefulSet(cluster *storagev2beta2.Mult
 							},
 						},
 					},
-					ImagePullSecrets: cluster.Spec.GroupTemplate.Spec.ImagePullSecrets,
+					ImagePullSecrets: cluster.Spec.ImagePullSecrets,
 					Volumes:          volumes,
 				},
 			},
@@ -710,17 +741,17 @@ func getNumReplicas(cluster *storagev2beta2.MultiRaftCluster) int {
 }
 
 func getNumMembers(cluster *storagev2beta2.MultiRaftCluster) int {
-	if cluster.Spec.GroupTemplate.Spec.Members == nil {
+	if cluster.Spec.Raft.Replicas == nil {
 		return getNumReplicas(cluster)
 	}
-	return int(*cluster.Spec.GroupTemplate.Spec.Members)
+	return int(*cluster.Spec.Raft.Replicas)
 }
 
 func getNumROMembers(cluster *storagev2beta2.MultiRaftCluster) int {
-	if cluster.Spec.GroupTemplate.Spec.ReadOnlyMembers == nil {
+	if cluster.Spec.Raft.ReadReplicas == nil {
 		return 0
 	}
-	return int(*cluster.Spec.GroupTemplate.Spec.ReadOnlyMembers)
+	return int(*cluster.Spec.Raft.ReadReplicas)
 }
 
 // getClusterResourceName returns the given resource name for the given cluster
@@ -754,8 +785,8 @@ func newClusterLabels(cluster *storagev2beta2.MultiRaftCluster) map[string]strin
 }
 
 func getImage(cluster *storagev2beta2.MultiRaftCluster) string {
-	if cluster.Spec.GroupTemplate.Spec.Image != "" {
-		return cluster.Spec.GroupTemplate.Spec.Image
+	if cluster.Spec.Image != "" {
+		return cluster.Spec.Image
 	}
 	return getDefaultImage()
 }

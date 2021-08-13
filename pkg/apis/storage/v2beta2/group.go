@@ -15,7 +15,6 @@
 package v2beta2
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -31,71 +30,21 @@ const (
 
 // RaftGroupSpec specifies a RaftGroupSpec configuration
 type RaftGroupSpec struct {
-	GroupID int32 `json:"groupId,omitempty"`
-
-	// Members is the number of members in the group
-	Members *int32 `json:"members,omitempty"`
-
-	// ReadOnlyMembers is the number of read-only members in the group
-	ReadOnlyMembers *int32 `json:"readOnlyMembers,omitempty"`
-
-	// Image is the image to run
-	Image string `json:"image,omitempty"`
-
-	// ImagePullPolicy is the pull policy to apply
-	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
-
-	// ImagePullSecrets is a list of secrets for pulling images
-	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
-
-	// SecurityContext is a pod security context
-	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
-
-	RaftConfig RaftGroupConfig `json:"raftConfig,omitempty"`
-
-	// VolumeClaimTemplate is the volume claim template for Raft logs
-	VolumeClaimTemplate *corev1.PersistentVolumeClaim `json:"volumeClaimTemplate,omitempty"`
+	RaftConfig `json:",inline"`
+	GroupID    int32 `json:"groupId,omitempty"`
 }
 
-// RaftGroupConfig is the configuration of a Raft group
-type RaftGroupConfig struct {
-	HeartbeatPeriod    *metav1.Duration        `json:"heartbeatPeriod,omitempty"`
-	ElectionTimeout    *metav1.Duration        `json:"electionTimeout,omitempty"`
-	SessionTimeout     *metav1.Duration        `json:"sessionTimeout,omitempty"`
-	SnapshotStrategy   *RaftSnapshotStrategy   `json:"snapshotStrategy,omitempty"`
-	CompactionStrategy *RaftCompactionStrategy `json:"compactionStrategy,omitempty"`
-}
-
-// RaftSnapshotStrategyType is a snapshot strategy constant
-type RaftSnapshotStrategyType string
-
-const (
-	// RaftSnapshotNone disables snapshots
-	RaftSnapshotNone RaftSnapshotStrategyType = "None"
-	// RaftSnapshotThreshold enables threshold-based snapshots
-	RaftSnapshotThreshold RaftSnapshotStrategyType = "Threshold"
-)
-
-// RaftSnapshotStrategy is a Raft snapshot strategy configuration
-type RaftSnapshotStrategy struct {
-	Type           RaftSnapshotStrategyType `json:"type,omitempty"`
-	EntryThreshold *int64                   `json:"entryThreshold,omitempty"`
-}
-
-// RaftCompactionStrategyType is a compaction strategy constant
-type RaftCompactionStrategyType string
-
-const (
-	// RaftCompactionNone disables log compaction
-	RaftCompactionNone RaftCompactionStrategyType = "None"
-	// RaftCompactionAuto enables automatic log compaction
-	RaftCompactionAuto RaftCompactionStrategyType = "Auto"
-)
-
-// RaftCompactionStrategy is a Raft compaction strategy configuration
-type RaftCompactionStrategy struct {
-	Type          RaftCompactionStrategyType `json:"type,omitempty"`
-	RetainEntries *int64                     `json:"retainEntries,omitempty"`
+// RaftConfig is the configuration of a Raft group
+type RaftConfig struct {
+	// Replicas is the number of replicas in the group
+	Replicas *int32 `json:"replicas,omitempty"`
+	// ReadReplicas is the number of read-only replicas in the group
+	ReadReplicas            *int32           `json:"readReplicas,omitempty"`
+	HeartbeatPeriod         *metav1.Duration `json:"heartbeatPeriod,omitempty"`
+	ElectionTimeout         *metav1.Duration `json:"electionTimeout,omitempty"`
+	SessionTimeout          *metav1.Duration `json:"sessionTimeout,omitempty"`
+	SnapshotEntryThreshold  *int64           `json:"snapshotEntryThreshold,omitempty"`
+	CompactionRetainEntries *int64           `json:"compactionRetainEntries,omitempty"`
 }
 
 // RaftGroupStatus defines the status of a RaftGroup

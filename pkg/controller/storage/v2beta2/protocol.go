@@ -126,7 +126,7 @@ func (r *MultiRaftProtocolReconciler) reconcileCluster(protocol *storagev2beta2.
 				Name:      protocol.Name,
 				Labels:    protocol.Labels,
 			},
-			Spec: protocol.Spec.Cluster,
+			Spec: protocol.Spec.MultiRaftClusterSpec,
 		}
 		if err := controllerutil.SetControllerReference(protocol, cluster, r.scheme); err != nil {
 			return false, err

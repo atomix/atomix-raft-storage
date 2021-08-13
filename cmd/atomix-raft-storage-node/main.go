@@ -42,7 +42,7 @@ import (
 const monitoringPort = 5000
 
 func main() {
-	logging.SetLevel(logging.InfoLevel)
+	logging.SetLevel(logging.DebugLevel)
 
 	nodeID := os.Args[1]
 	protocolConfig := parseProtocolConfig()

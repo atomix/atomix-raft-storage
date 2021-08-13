@@ -31,7 +31,7 @@ const (
 
 // MultiRaftProtocolSpec specifies a MultiRaftProtocol configuration
 type MultiRaftProtocolSpec struct {
-	Cluster MultiRaftClusterSpec `json:"cluster,omitempty"`
+	MultiRaftClusterSpec `json:",inline"`
 }
 
 // MultiRaftProtocolStatus defines the status of a MultiRaftProtocol

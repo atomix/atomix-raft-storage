@@ -15,6 +15,7 @@
 package v2beta2
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -34,13 +35,25 @@ type MultiRaftClusterSpec struct {
 	Replicas int32 `json:"replicas,omitempty"`
 
 	// Groups is the number of groups
-	Groups        int32                 `json:"groups,omitempty"`
-	GroupTemplate RaftGroupTemplateSpec `json:"template,omitempty"`
-}
+	Groups int32 `json:"groups,omitempty"`
 
-// RaftGroupTemplateSpec specifies a RaftGroup template
-type RaftGroupTemplateSpec struct {
-	Spec RaftGroupSpec `json:"spec,omitempty"`
+	// Image is the image to run
+	Image string `json:"image,omitempty"`
+
+	// ImagePullPolicy is the pull policy to apply
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// ImagePullSecrets is a list of secrets for pulling images
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
+	// SecurityContext is a pod security context
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// VolumeClaimTemplate is the volume claim template for Raft logs
+	VolumeClaimTemplate *corev1.PersistentVolumeClaim `json:"volumeClaimTemplate,omitempty"`
+
+	// Raft is the Raft protocol configuration
+	Raft RaftConfig `json:"raft,omitempty"`
 }
 
 // MultiRaftClusterStatus defines the status of a RaftCluster
