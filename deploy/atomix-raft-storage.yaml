@@ -79,15 +79,13 @@ spec:
               raft:
                 type: object
                 properties:
-                  replicas:
+                  quorumSize:
                     type: integer
                   readReplicas:
                     type: integer
                   heartbeatPeriod:
                     type: string
                   electionTimeout:
-                    type: string
-                  sessionTimeout:
                     type: string
                   snapshotEntryThreshold:
                     type: integer
@@ -207,15 +205,13 @@ spec:
               raft:
                 type: object
                 properties:
-                  replicas:
+                  quorumSize:
                     type: integer
                   readReplicas:
                     type: integer
                   heartbeatPeriod:
                     type: string
                   electionTimeout:
-                    type: string
-                  sessionTimeout:
                     type: string
                   snapshotEntryThreshold:
                     type: integer
@@ -265,53 +261,20 @@ spec:
               groupId:
                 type: integer
                 minumum: 1
-              members:
+              quorumSize:
                 type: integer
-                minimum: 1
-              readOnlyMembers:
+              readReplicas:
                 type: integer
-              image:
+              heartbeatPeriod:
                 type: string
-              imagePullPolicy:
+              electionTimeout:
                 type: string
-              imagePullSecrets:
-                type: array
-                items:
-                  type: object
-                  required:
-                  - name
-                  properties:
-                    name:
-                      type: string
-              securityContext:
-                type: object
-                x-kubernetes-preserve-unknown-fields: true
-              volumeClaimTemplate:
-                x-kubernetes-preserve-unknown-fields: true
-                type: object
-              raftConfig:
-                type: object
-                properties:
-                  heartbeatPeriod:
-                    type: string
-                  electionTimeout:
-                    type: string
-                  sessionTimeout:
-                    type: string
-                  snapshotStrategy:
-                    type: object
-                    properties:
-                      type:
-                        type: string
-                      entryThreshold:
-                        type: integer
-                  compactionStrategy:
-                    type: object
-                    properties:
-                      type:
-                        type: string
-                      retainEntries:
-                        type: integer
+              snapshotEntryThreshold:
+                type: integer
+                minimum: 0
+              compactionRetainEntries:
+                type: integer
+                minimum: 0
           status:
             type: object
             properties:

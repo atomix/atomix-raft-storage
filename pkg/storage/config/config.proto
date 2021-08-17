@@ -26,11 +26,10 @@ option (gogoproto.populate_all) = true;
 option (gogoproto.equal_all) = true;
 
 message ProtocolConfig {
-    google.protobuf.Duration session_timeout = 1 [(gogoproto.stdduration) = true];
-    google.protobuf.Duration heartbeat_period = 2 [(gogoproto.stdduration) = true];
-    google.protobuf.Duration election_timeout = 3 [(gogoproto.stdduration) = true];
-    uint64 snapshot_entry_threshold = 4;
-    uint64 compaction_retain_entries = 5;
+    google.protobuf.Duration heartbeat_period = 1 [(gogoproto.stdduration) = true];
+    google.protobuf.Duration election_timeout = 2 [(gogoproto.stdduration) = true];
+    uint64 snapshot_entry_threshold = 3;
+    uint64 compaction_retain_entries = 4;
 }
 
 enum NodeType {

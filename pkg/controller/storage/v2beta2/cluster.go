@@ -302,10 +302,6 @@ func newNodeConfigString(cluster *storagev2beta2.MultiRaftCluster) (string, erro
 // newProtocolConfigString creates a protocol configuration string for the given cluster and protocol
 func newProtocolConfigString(cluster *storagev2beta2.MultiRaftCluster) (string, error) {
 	config := raftconfig.ProtocolConfig{}
-	sessionTimeout := cluster.Spec.Raft.SessionTimeout
-	if sessionTimeout != nil {
-		config.SessionTimeout = &sessionTimeout.Duration
-	}
 
 	electionTimeout := cluster.Spec.Raft.ElectionTimeout
 	if electionTimeout != nil {
@@ -741,10 +737,10 @@ func getNumReplicas(cluster *storagev2beta2.MultiRaftCluster) int {
 }
 
 func getNumMembers(cluster *storagev2beta2.MultiRaftCluster) int {
-	if cluster.Spec.Raft.Replicas == nil {
+	if cluster.Spec.Raft.QuorumSize == nil {
 		return getNumReplicas(cluster)
 	}
-	return int(*cluster.Spec.Raft.Replicas)
+	return int(*cluster.Spec.Raft.QuorumSize)
 }
 
 func getNumROMembers(cluster *storagev2beta2.MultiRaftCluster) int {

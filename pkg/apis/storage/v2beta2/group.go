@@ -36,13 +36,12 @@ type RaftGroupSpec struct {
 
 // RaftConfig is the configuration of a Raft group
 type RaftConfig struct {
-	// Replicas is the number of replicas in the group
-	Replicas *int32 `json:"replicas,omitempty"`
+	// QuorumSize is the number of replicas in the group
+	QuorumSize *int32 `json:"quorumSize,omitempty"`
 	// ReadReplicas is the number of read-only replicas in the group
 	ReadReplicas            *int32           `json:"readReplicas,omitempty"`
 	HeartbeatPeriod         *metav1.Duration `json:"heartbeatPeriod,omitempty"`
 	ElectionTimeout         *metav1.Duration `json:"electionTimeout,omitempty"`
-	SessionTimeout          *metav1.Duration `json:"sessionTimeout,omitempty"`
 	SnapshotEntryThreshold  *int64           `json:"snapshotEntryThreshold,omitempty"`
 	CompactionRetainEntries *int64           `json:"compactionRetainEntries,omitempty"`
 }
