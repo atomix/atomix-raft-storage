@@ -182,6 +182,7 @@ func (r *RaftGroupReconciler) reconcileStatus(cluster *storagev2beta2.MultiRaftC
 		return false, err
 	}
 
+	changed := false
 	state := storagev2beta2.RaftGroupReady
 	for _, replica := range replicas {
 		if !replica.Ready {
@@ -192,6 +193,35 @@ func (r *RaftGroupReconciler) reconcileStatus(cluster *storagev2beta2.MultiRaftC
 
 	if group.Status.State != state {
 		group.Status.State = state
+		r.events.Event(group, "Normal", string(state), "Group state changed")
+		changed = true
+	}
+
+	for memberID := 0; memberID < getNumMembers(cluster); memberID++ {
+		member := &storagev2beta2.RaftMember{}
+		memberName := types.NamespacedName{
+			Namespace: group.Namespace,
+			Name:      fmt.Sprintf("%s-%d", group.Name, memberID),
+		}
+		if err := r.client.Get(context.TODO(), memberName, member); err != nil {
+			return false, err
+		}
+
+		if member.Status.Term != nil && (group.Status.Term == nil || *member.Status.Term > *group.Status.Term) {
+			group.Status.Term = member.Status.Term
+			group.Status.Leader = nil
+			r.events.Eventf(group, "Normal", "TermChanged", "Term changed to %d", *group.Status.Term)
+			changed = true
+		}
+
+		if member.Status.Leader != nil && group.Status.Leader == nil {
+			group.Status.Leader = member.Status.Leader
+			r.events.Eventf(group, "Normal", "LeaderChanged", "Leader changed to %s", *group.Status.Leader)
+			changed = true
+		}
+	}
+
+	if changed {
 		if err := r.client.Status().Update(context.TODO(), group); err != nil {
 			return false, err
 		}

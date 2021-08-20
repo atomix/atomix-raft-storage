@@ -356,12 +356,12 @@ func (r *RaftMemberReconciler) recordLeaderUpdated(memberName types.NamespacedNa
 
 	if member.Status.Term == nil || *member.Status.Term != event.Term {
 		r.events.Eventf(member, "Normal", "TermChanged", "Term changed to %d", event.Term)
-		r.events.Eventf(pod, "Normal", "PartitionTermChanged", "Term for partition %d changed to %d", event.Partition, event.Term)
+		r.events.Eventf(pod, "Normal", "GroupTermChanged", "Term for partition %d changed to %d", event.Partition, event.Term)
 	}
 
 	if event.Leader != "" && (member.Status.Leader == nil || *member.Status.Leader != event.Leader) {
 		r.events.Eventf(member, "Normal", "LeaderChanged", "Leader for term %d changed to %s", event.Term, event.Leader)
-		r.events.Eventf(pod, "Normal", "PartitionLeaderChanged", "Leader for partition %d changed to %s for term %d", event.Partition, event.Leader, event.Term)
+		r.events.Eventf(pod, "Normal", "GroupLeaderChanged", "Leader for partition %d changed to %s for term %d", event.Partition, event.Leader, event.Term)
 	}
 
 	err = backoff.Retry(func() error {
@@ -398,7 +398,7 @@ func (r *RaftMemberReconciler) recordMembershipChanged(memberName types.Namespac
 	if err != nil {
 		log.Error(err)
 	}
-	r.events.Eventf(pod, "Normal", "PartitionMembershipChanged", "Membership changed in partition %d", event.Partition)
+	r.events.Eventf(pod, "Normal", "GroupMembershipChanged", "Membership changed in group %d", event.Partition)
 	r.events.Eventf(member, "Normal", "MembershipChanged", "Membership changed")
 }
 
@@ -411,7 +411,7 @@ func (r *RaftMemberReconciler) recordSendSnapshotStarted(memberName types.Namesp
 	if err != nil {
 		log.Error(err)
 	}
-	r.events.Eventf(pod, "Normal", "PartitionSendSnapshotStared", "Started sending partition %d snapshot at index %d to %s", event.Partition, event.Index, event.To)
+	r.events.Eventf(pod, "Normal", "GroupSendSnapshotStared", "Started sending group %d snapshot at index %d to %s", event.Partition, event.Index, event.To)
 	r.events.Eventf(member, "Normal", "SendSnapshotStared", "Started sending snapshot at index %d to %s", event.Index, event.To)
 }
 
@@ -424,7 +424,7 @@ func (r *RaftMemberReconciler) recordSendSnapshotCompleted(memberName types.Name
 	if err != nil {
 		log.Error(err)
 	}
-	r.events.Eventf(pod, "Normal", "PartitionSendSnapshotCompleted", "Completed sending partition %d snapshot at index %d to %s", event.Partition, event.Index, event.To)
+	r.events.Eventf(pod, "Normal", "GroupSendSnapshotCompleted", "Completed sending group %d snapshot at index %d to %s", event.Partition, event.Index, event.To)
 	r.events.Eventf(member, "Normal", "SendSnapshotCompleted", "Completed sending snapshot at index %d to %s", event.Index, event.To)
 }
 
@@ -437,7 +437,7 @@ func (r *RaftMemberReconciler) recordSendSnapshotAborted(memberName types.Namesp
 	if err != nil {
 		log.Error(err)
 	}
-	r.events.Eventf(pod, "Warning", "PartitionSendSnapshotAborted", "Aborted sending partition %d snapshot at index %d to %s", event.Partition, event.Index, event.To)
+	r.events.Eventf(pod, "Warning", "GroupSendSnapshotAborted", "Aborted sending group %d snapshot at index %d to %s", event.Partition, event.Index, event.To)
 	r.events.Eventf(member, "Warning", "SendSnapshotAborted", "Aborted sending snapshot at index %d to %s", event.Index, event.To)
 }
 
@@ -450,7 +450,7 @@ func (r *RaftMemberReconciler) recordSnapshotReceived(memberName types.Namespace
 	if err != nil {
 		log.Error(err)
 	}
-	r.events.Eventf(pod, "Normal", "PartitionSnapshotReceived", "Partition %d received snapshot at index %d from %s", event.Partition, event.Index, event.From)
+	r.events.Eventf(pod, "Normal", "GroupSnapshotReceived", "Group %d received snapshot at index %d from %s", event.Partition, event.Index, event.From)
 	r.events.Eventf(member, "Normal", "SnapshotReceived", "Received snapshot at index %d from %s", event.Index, event.From)
 
 	err = backoff.Retry(func() error {
@@ -479,7 +479,7 @@ func (r *RaftMemberReconciler) recordSnapshotRecovered(memberName types.Namespac
 	if err != nil {
 		log.Error(err)
 	}
-	r.events.Eventf(pod, "Normal", "PartitionSnapshotRecovered", "Recovered partition %d from snapshot at index %d", event.Partition, event.Index)
+	r.events.Eventf(pod, "Normal", "GroupSnapshotRecovered", "Recovered group %d from snapshot at index %d", event.Partition, event.Index)
 	r.events.Eventf(member, "Normal", "SnapshotRecovered", "Recovered from snapshot at index %d", event.Index)
 
 	err = backoff.Retry(func() error {
@@ -508,7 +508,7 @@ func (r *RaftMemberReconciler) recordSnapshotCreated(memberName types.Namespaced
 	if err != nil {
 		log.Error(err)
 	}
-	r.events.Eventf(pod, "Normal", "PartitionSnapshotCreated", "Created partition %d snapshot at index %d", event.Partition, event.Index)
+	r.events.Eventf(pod, "Normal", "GroupSnapshotCreated", "Created group %d snapshot at index %d", event.Partition, event.Index)
 	r.events.Eventf(member, "Normal", "SnapshotCreated", "Created snapshot at index %d", event.Index)
 
 	err = backoff.Retry(func() error {
@@ -537,7 +537,7 @@ func (r *RaftMemberReconciler) recordSnapshotCompacted(memberName types.Namespac
 	if err != nil {
 		log.Error(err)
 	}
-	r.events.Eventf(pod, "Normal", "PartitionSnapshotCompacted", "Compacted partition %d snapshot at index %d", event.Partition, event.Index)
+	r.events.Eventf(pod, "Normal", "GroupSnapshotCompacted", "Compacted group %d snapshot at index %d", event.Partition, event.Index)
 	r.events.Eventf(member, "Normal", "SnapshotCompacted", "Compacted snapshot at index %d", event.Index)
 
 	err = backoff.Retry(func() error {
@@ -566,7 +566,7 @@ func (r *RaftMemberReconciler) recordLogCompacted(memberName types.NamespacedNam
 	if err != nil {
 		log.Error(err)
 	}
-	r.events.Eventf(pod, "Normal", "PartitionLogCompacted", "Log in partition %d compacted at index %d", event.Partition, event.Index)
+	r.events.Eventf(pod, "Normal", "GroupLogCompacted", "Log in group %d compacted at index %d", event.Partition, event.Index)
 	r.events.Eventf(member, "Normal", "LogCompacted", "Log compacted at index %d", event.Index)
 }
 
@@ -579,7 +579,7 @@ func (r *RaftMemberReconciler) recordLogDBCompacted(memberName types.NamespacedN
 	if err != nil {
 		log.Error(err)
 	}
-	r.events.Eventf(pod, "Normal", "PartitionLogDBCompacted", "LogDB in partition %d compacted at index %d", event.Partition, event.Index)
+	r.events.Eventf(pod, "Normal", "GroupLogDBCompacted", "LogDB in group %d compacted at index %d", event.Partition, event.Index)
 	r.events.Eventf(member, "Normal", "LogDBCompacted", "LogDB compacted at index %d", event.Index)
 }
 
