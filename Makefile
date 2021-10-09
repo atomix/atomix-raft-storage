@@ -4,9 +4,9 @@ export GO111MODULE=on
 .PHONY: build
 
 ifdef VERSION
-ATOMIX_RAFT_STORAGE_VERSION := $(VERSION)
-else
-ATOMIX_RAFT_STORAGE_VERSION := latest
+MAJOR := $(word 1, $(subst ., , $(VERSION)))
+MINOR := $(word 2, $(subst ., , $(VERSION)))
+PATCH := $(word 3, $(subst ., , $(VERSION)))
 endif
 
 all: build
@@ -42,17 +42,41 @@ proto:
 
 images: # @HELP build atomix storage controller Docker images
 images: build
-	docker build . -f build/atomix-raft-storage-node/Dockerfile       -t atomix/atomix-raft-storage-node:${ATOMIX_RAFT_STORAGE_VERSION}
-	docker build . -f build/atomix-raft-storage-driver/Dockerfile     -t atomix/atomix-raft-storage-driver:${ATOMIX_RAFT_STORAGE_VERSION}
-	docker build . -f build/atomix-raft-storage-controller/Dockerfile -t atomix/atomix-raft-storage-controller:${ATOMIX_RAFT_STORAGE_VERSION}
+	docker build . -f build/atomix-raft-storage-node/Dockerfile       -t atomix/atomix-raft-storage-node:latest
+	docker build . -f build/atomix-raft-storage-driver/Dockerfile     -t atomix/atomix-raft-storage-driver:latest
+	docker build . -f build/atomix-raft-storage-controller/Dockerfile -t atomix/atomix-raft-storage-controller:latest
+ifdef VERSION
+	docker tag atomix/atomix-raft-storage-node:latest atomix/atomix-raft-storage-node:${MAJOR}.${MINOR}.${PATCH}
+	docker tag atomix/atomix-raft-storage-node:latest atomix/atomix-raft-storage-node:${MAJOR}.${MINOR}
+	docker tag atomix/atomix-raft-storage-driver:latest atomix/atomix-raft-storage-driver:${MAJOR}.${MINOR}.${PATCH}
+	docker tag atomix/atomix-raft-storage-driver:latest atomix/atomix-raft-storage-driver:${MAJOR}.${MINOR}
+	docker tag atomix/atomix-raft-storage-controller:latest atomix/atomix-raft-storage-controller:${MAJOR}.${MINOR}.${PATCH}
+	docker tag atomix/atomix-raft-storage-controller:latest atomix/atomix-raft-storage-controller:${MAJOR}.${MINOR}
+endif
 
 kind: images
 	@if [ "`kind get clusters`" = '' ]; then echo "no kind cluster found" && exit 1; fi
-	kind load docker-image atomix/atomix-raft-storage-node:${ATOMIX_RAFT_STORAGE_VERSION}
-	kind load docker-image atomix/atomix-raft-storage-driver:${ATOMIX_RAFT_STORAGE_VERSION}
-	kind load docker-image atomix/atomix-raft-storage-controller:${ATOMIX_RAFT_STORAGE_VERSION}
+	kind load docker-image atomix/atomix-raft-storage-node:latest
+	kind load docker-image atomix/atomix-raft-storage-driver:latest
+	kind load docker-image atomix/atomix-raft-storage-controller:latest
+ifdef VERSION
+	kind load docker-image atomix/atomix-raft-storage-node:${MAJOR}.${MINOR}.${PATCH}
+	kind load docker-image atomix/atomix-raft-storage-node:${MAJOR}.${MINOR}
+	kind load docker-image atomix/atomix-raft-storage-driver:${MAJOR}.${MINOR}.${PATCH}
+	kind load docker-image atomix/atomix-raft-storage-driver:${MAJOR}.${MINOR}
+	kind load docker-image atomix/atomix-raft-storage-controller:${MAJOR}.${MINOR}.${PATCH}
+	kind load docker-image atomix/atomix-raft-storage-controller:${MAJOR}.${MINOR}
+endif
 
 push: # @HELP push atomix-raft-node Docker image
-	docker push atomix/atomix-raft-storage-node:${ATOMIX_RAFT_STORAGE_VERSION}
-	docker push atomix/atomix-raft-storage-driver:${ATOMIX_RAFT_STORAGE_VERSION}
-	docker push atomix/atomix-raft-storage-controller:${ATOMIX_RAFT_STORAGE_VERSION}
+	docker push atomix/atomix-raft-storage-node:latest
+	docker push atomix/atomix-raft-storage-driver:latest
+	docker push atomix/atomix-raft-storage-controller:latest
+ifdef VERSION
+	docker push atomix/atomix-raft-storage-node:${MAJOR}.${MINOR}.${PATCH}
+	docker push atomix/atomix-raft-storage-node:${MAJOR}.${MINOR}
+	docker push atomix/atomix-raft-storage-driver:${MAJOR}.${MINOR}.${PATCH}
+	docker push atomix/atomix-raft-storage-driver:${MAJOR}.${MINOR}
+	docker push atomix/atomix-raft-storage-controller:${MAJOR}.${MINOR}.${PATCH}
+	docker push atomix/atomix-raft-storage-controller:${MAJOR}.${MINOR}
+endif
