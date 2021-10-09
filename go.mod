@@ -5,7 +5,7 @@ go 1.12
 require (
 	github.com/atomix/atomix-api/go v0.4.9
 	github.com/atomix/atomix-controller v0.6.0
-	github.com/atomix/atomix-go-framework v0.9.7
+	github.com/atomix/atomix-go-framework v0.9.8
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/gogo/protobuf v1.3.1
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
