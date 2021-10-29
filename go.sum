@@ -55,8 +55,8 @@ github.com/atomix/atomix-controller v0.6.0 h1:GVuJv0vKDUFkP2Je3fA/Zb8/Bl1eS+NXHe
 github.com/atomix/atomix-controller v0.6.0/go.mod h1:81i5273apZO3OlVnElUItb7GReXrqGVmtbanY9AQrYs=
 github.com/atomix/atomix-go-framework v0.9.0 h1:E/aDiSHXzWlPObOXzjAYTz8V9ew+K53YjoLsXJPFX4A=
 github.com/atomix/atomix-go-framework v0.9.0/go.mod h1:5diVS7TBAK8u6785FoZXAwnMSYVMdv2sJbCghsD3roE=
-github.com/atomix/atomix-go-framework v0.9.9 h1:ml9ywJXMBAq2xR9bbDGpFMIikyD6RVx0YDMsyH3Huzk=
-github.com/atomix/atomix-go-framework v0.9.9/go.mod h1:5diVS7TBAK8u6785FoZXAwnMSYVMdv2sJbCghsD3roE=
+github.com/atomix/atomix-go-framework v0.9.10 h1:UcQzaNIsnV9HtZciVt46JS34nIqEEP+rCs37DNjzwi8=
+github.com/atomix/atomix-go-framework v0.9.10/go.mod h1:5diVS7TBAK8u6785FoZXAwnMSYVMdv2sJbCghsD3roE=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0 h1:HWo1m869IqiPhD389kmkxeTalrjNbbJTC8LXupb+sl0=
