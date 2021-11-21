@@ -7,15 +7,35 @@ ifdef VERSION
 MAJOR := $(word 1, $(subst ., , $(VERSION)))
 MINOR := $(word 2, $(subst ., , $(VERSION)))
 PATCH := $(word 3, $(subst ., , $(VERSION)))
+DRIVER_FILE := raft-$(VERSION).so
+ENGINE_FILE := raft-$(VERSION).so
+else
+DRIVER_FILE := raft-$(shell git rev-parse HEAD).so
+ENGINE_FILE := raft-$(shell git rev-parse HEAD).so
 endif
+
+DRIVER_DIR ?= driver
+ENGINE_DIR ?= engine
 
 all: build
 
-build: # @HELP build the source code
-build: deps
-	GOOS=linux GOARCH=amd64 go build -gcflags=-trimpath=${GOPATH} -asmflags=-trimpath=${GOPATH} -o build/_output/atomix-raft-storage-node ./cmd/atomix-raft-storage-node
-	GOOS=linux GOARCH=amd64 go build -gcflags=-trimpath=${GOPATH} -asmflags=-trimpath=${GOPATH} -o build/_output/atomix-raft-storage-driver ./cmd/atomix-raft-storage-driver
-	GOOS=linux GOARCH=amd64 go build -gcflags=-trimpath=${GOPATH} -asmflags=-trimpath=${GOPATH} -o build/_output/atomix-raft-storage-controller ./cmd/atomix-raft-storage-controller
+build-driver:
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
+		-gcflags=-trimpath=${GOPATH} \
+		-asmflags=-trimpath=${GOPATH} \
+		-buildmode=plugin \
+		-o $(DRIVER_DIR)/$(DRIVER_FILE) \
+		github.com/atomix/atomix-raft-storage/plugins/driver
+
+build-engine:
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
+		-gcflags=-trimpath=${GOPATH} \
+		-asmflags=-trimpath=${GOPATH} \
+		-buildmode=plugin \
+		-o $(ENGINE_DIR)/$(ENGINE_FILE) \
+		github.com/atomix/atomix-raft-storage/plugins/engine
+
+build: deps build-driver build-engine
 
 deps: # @HELP ensure that the required dependencies are in place
 	go build -v ./...

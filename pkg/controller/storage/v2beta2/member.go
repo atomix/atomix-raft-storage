@@ -18,7 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/atomix/atomix-raft-storage/pkg/storage"
+	"github.com/atomix/atomix-raft-storage/pkg/engine"
 	"github.com/cenkalti/backoff"
 	"google.golang.org/grpc"
 	"io"
@@ -172,10 +172,10 @@ func (r *RaftMemberReconciler) startMonitoringPod(member *storagev2beta2.RaftMem
 		return err
 	}
 
-	client := storage.NewRaftEventsClient(conn)
+	client := engine.NewRaftEventsClient(conn)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	stream, err := client.Subscribe(ctx, &storage.SubscribeRequest{})
+	stream, err := client.Subscribe(ctx, &engine.SubscribeRequest{})
 	if err != nil {
 		cancel()
 		return err
@@ -221,57 +221,57 @@ func (r *RaftMemberReconciler) startMonitoringPod(member *storagev2beta2.RaftMem
 			log.Infof("Received event %+v from %s", event, member.Name)
 
 			switch e := event.Event.(type) {
-			case *storage.RaftEvent_MemberReady:
+			case *engine.RaftEvent_MemberReady:
 				if int(e.MemberReady.Partition) == partitionID {
 					r.recordPartitionReady(memberName, e.MemberReady, metav1.NewTime(event.Timestamp))
 				}
-			case *storage.RaftEvent_LeaderUpdated:
+			case *engine.RaftEvent_LeaderUpdated:
 				if int(e.LeaderUpdated.Partition) == partitionID {
 					r.recordLeaderUpdated(memberName, e.LeaderUpdated, metav1.NewTime(event.Timestamp))
 				}
-			case *storage.RaftEvent_MembershipChanged:
+			case *engine.RaftEvent_MembershipChanged:
 				if int(e.MembershipChanged.Partition) == partitionID {
 					r.recordMembershipChanged(memberName, e.MembershipChanged, metav1.NewTime(event.Timestamp))
 				}
-			case *storage.RaftEvent_SendSnapshotStarted:
+			case *engine.RaftEvent_SendSnapshotStarted:
 				if int(e.SendSnapshotStarted.Partition) == partitionID {
 					r.recordSendSnapshotStarted(memberName, e.SendSnapshotStarted, metav1.NewTime(event.Timestamp))
 				}
-			case *storage.RaftEvent_SendSnapshotCompleted:
+			case *engine.RaftEvent_SendSnapshotCompleted:
 				if int(e.SendSnapshotCompleted.Partition) == partitionID {
 					r.recordSendSnapshotCompleted(memberName, e.SendSnapshotCompleted, metav1.NewTime(event.Timestamp))
 				}
-			case *storage.RaftEvent_SendSnapshotAborted:
+			case *engine.RaftEvent_SendSnapshotAborted:
 				if int(e.SendSnapshotAborted.Partition) == partitionID {
 					r.recordSendSnapshotAborted(memberName, e.SendSnapshotAborted, metav1.NewTime(event.Timestamp))
 				}
-			case *storage.RaftEvent_SnapshotReceived:
+			case *engine.RaftEvent_SnapshotReceived:
 				if int(e.SnapshotReceived.Partition) == partitionID {
 					r.recordSnapshotReceived(memberName, e.SnapshotReceived, metav1.NewTime(event.Timestamp))
 				}
-			case *storage.RaftEvent_SnapshotRecovered:
+			case *engine.RaftEvent_SnapshotRecovered:
 				if int(e.SnapshotRecovered.Partition) == partitionID {
 					r.recordSnapshotRecovered(memberName, e.SnapshotRecovered, metav1.NewTime(event.Timestamp))
 				}
-			case *storage.RaftEvent_SnapshotCreated:
+			case *engine.RaftEvent_SnapshotCreated:
 				if int(e.SnapshotCreated.Partition) == partitionID {
 					r.recordSnapshotCreated(memberName, e.SnapshotCreated, metav1.NewTime(event.Timestamp))
 				}
-			case *storage.RaftEvent_SnapshotCompacted:
+			case *engine.RaftEvent_SnapshotCompacted:
 				if int(e.SnapshotCompacted.Partition) == partitionID {
 					r.recordSnapshotCompacted(memberName, e.SnapshotCompacted, metav1.NewTime(event.Timestamp))
 				}
-			case *storage.RaftEvent_LogCompacted:
+			case *engine.RaftEvent_LogCompacted:
 				if int(e.LogCompacted.Partition) == partitionID {
 					r.recordLogCompacted(memberName, e.LogCompacted, metav1.NewTime(event.Timestamp))
 				}
-			case *storage.RaftEvent_LogdbCompacted:
+			case *engine.RaftEvent_LogdbCompacted:
 				if int(e.LogdbCompacted.Partition) == partitionID {
 					r.recordLogDBCompacted(memberName, e.LogdbCompacted, metav1.NewTime(event.Timestamp))
 				}
-			case *storage.RaftEvent_ConnectionEstablished:
+			case *engine.RaftEvent_ConnectionEstablished:
 				r.recordConnectionEstablished(memberName, e.ConnectionEstablished, metav1.NewTime(event.Timestamp))
-			case *storage.RaftEvent_ConnectionFailed:
+			case *engine.RaftEvent_ConnectionFailed:
 				r.recordConnectionFailed(memberName, e.ConnectionFailed, metav1.NewTime(event.Timestamp))
 			}
 		}
@@ -316,7 +316,7 @@ func (r *RaftMemberReconciler) getPod(member *storagev2beta2.RaftMember) (*corev
 	return pod, nil
 }
 
-func (r *RaftMemberReconciler) recordPartitionReady(memberName types.NamespacedName, event *storage.MemberReadyEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordPartitionReady(memberName types.NamespacedName, event *engine.MemberReadyEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)
@@ -344,7 +344,7 @@ func (r *RaftMemberReconciler) recordPartitionReady(memberName types.NamespacedN
 	}
 }
 
-func (r *RaftMemberReconciler) recordLeaderUpdated(memberName types.NamespacedName, event *storage.LeaderUpdatedEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordLeaderUpdated(memberName types.NamespacedName, event *engine.LeaderUpdatedEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)
@@ -389,7 +389,7 @@ func (r *RaftMemberReconciler) recordLeaderUpdated(memberName types.NamespacedNa
 	}
 }
 
-func (r *RaftMemberReconciler) recordMembershipChanged(memberName types.NamespacedName, event *storage.MembershipChangedEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordMembershipChanged(memberName types.NamespacedName, event *engine.MembershipChangedEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)
@@ -402,7 +402,7 @@ func (r *RaftMemberReconciler) recordMembershipChanged(memberName types.Namespac
 	r.events.Eventf(member, "Normal", "MembershipChanged", "Membership changed")
 }
 
-func (r *RaftMemberReconciler) recordSendSnapshotStarted(memberName types.NamespacedName, event *storage.SendSnapshotStartedEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordSendSnapshotStarted(memberName types.NamespacedName, event *engine.SendSnapshotStartedEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)
@@ -415,7 +415,7 @@ func (r *RaftMemberReconciler) recordSendSnapshotStarted(memberName types.Namesp
 	r.events.Eventf(member, "Normal", "SendSnapshotStared", "Started sending snapshot at index %d to %s", event.Index, event.To)
 }
 
-func (r *RaftMemberReconciler) recordSendSnapshotCompleted(memberName types.NamespacedName, event *storage.SendSnapshotCompletedEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordSendSnapshotCompleted(memberName types.NamespacedName, event *engine.SendSnapshotCompletedEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)
@@ -428,7 +428,7 @@ func (r *RaftMemberReconciler) recordSendSnapshotCompleted(memberName types.Name
 	r.events.Eventf(member, "Normal", "SendSnapshotCompleted", "Completed sending snapshot at index %d to %s", event.Index, event.To)
 }
 
-func (r *RaftMemberReconciler) recordSendSnapshotAborted(memberName types.NamespacedName, event *storage.SendSnapshotAbortedEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordSendSnapshotAborted(memberName types.NamespacedName, event *engine.SendSnapshotAbortedEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)
@@ -441,7 +441,7 @@ func (r *RaftMemberReconciler) recordSendSnapshotAborted(memberName types.Namesp
 	r.events.Eventf(member, "Warning", "SendSnapshotAborted", "Aborted sending snapshot at index %d to %s", event.Index, event.To)
 }
 
-func (r *RaftMemberReconciler) recordSnapshotReceived(memberName types.NamespacedName, event *storage.SnapshotReceivedEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordSnapshotReceived(memberName types.NamespacedName, event *engine.SnapshotReceivedEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)
@@ -470,7 +470,7 @@ func (r *RaftMemberReconciler) recordSnapshotReceived(memberName types.Namespace
 	}
 }
 
-func (r *RaftMemberReconciler) recordSnapshotRecovered(memberName types.NamespacedName, event *storage.SnapshotRecoveredEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordSnapshotRecovered(memberName types.NamespacedName, event *engine.SnapshotRecoveredEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)
@@ -499,7 +499,7 @@ func (r *RaftMemberReconciler) recordSnapshotRecovered(memberName types.Namespac
 	}
 }
 
-func (r *RaftMemberReconciler) recordSnapshotCreated(memberName types.NamespacedName, event *storage.SnapshotCreatedEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordSnapshotCreated(memberName types.NamespacedName, event *engine.SnapshotCreatedEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)
@@ -528,7 +528,7 @@ func (r *RaftMemberReconciler) recordSnapshotCreated(memberName types.Namespaced
 	}
 }
 
-func (r *RaftMemberReconciler) recordSnapshotCompacted(memberName types.NamespacedName, event *storage.SnapshotCompactedEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordSnapshotCompacted(memberName types.NamespacedName, event *engine.SnapshotCompactedEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)
@@ -557,7 +557,7 @@ func (r *RaftMemberReconciler) recordSnapshotCompacted(memberName types.Namespac
 	}
 }
 
-func (r *RaftMemberReconciler) recordLogCompacted(memberName types.NamespacedName, event *storage.LogCompactedEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordLogCompacted(memberName types.NamespacedName, event *engine.LogCompactedEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)
@@ -570,7 +570,7 @@ func (r *RaftMemberReconciler) recordLogCompacted(memberName types.NamespacedNam
 	r.events.Eventf(member, "Normal", "LogCompacted", "Log compacted at index %d", event.Index)
 }
 
-func (r *RaftMemberReconciler) recordLogDBCompacted(memberName types.NamespacedName, event *storage.LogDBCompactedEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordLogDBCompacted(memberName types.NamespacedName, event *engine.LogDBCompactedEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)
@@ -583,7 +583,7 @@ func (r *RaftMemberReconciler) recordLogDBCompacted(memberName types.NamespacedN
 	r.events.Eventf(member, "Normal", "LogDBCompacted", "LogDB compacted at index %d", event.Index)
 }
 
-func (r *RaftMemberReconciler) recordConnectionEstablished(memberName types.NamespacedName, event *storage.ConnectionEstablishedEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordConnectionEstablished(memberName types.NamespacedName, event *engine.ConnectionEstablishedEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)
@@ -595,7 +595,7 @@ func (r *RaftMemberReconciler) recordConnectionEstablished(memberName types.Name
 	r.events.Eventf(pod, "Normal", "ConnectionEstablished", "Connection established to %s", event.Address)
 }
 
-func (r *RaftMemberReconciler) recordConnectionFailed(memberName types.NamespacedName, event *storage.ConnectionFailedEvent, timestamp metav1.Time) {
+func (r *RaftMemberReconciler) recordConnectionFailed(memberName types.NamespacedName, event *engine.ConnectionFailedEvent, timestamp metav1.Time) {
 	member, err := r.getMember(memberName)
 	if err != nil {
 		log.Error(err)

@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package storage
+package engine
 
 import (
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	protocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/stream"
+	protocol "github.com/atomix/atomix-sdk-go/pkg/engine/protocol/rsm"
+	"github.com/atomix/atomix-sdk-go/pkg/stream"
 	"github.com/gogo/protobuf/proto"
 	"github.com/lni/dragonboat/v3/statemachine"
 	"io"
@@ -25,7 +24,7 @@ import (
 )
 
 // newStateMachine returns a new primitive state machine
-func newStateMachine(cluster cluster.Cluster, partitionID protocol.PartitionID, registry *protocol.Registry, streams *streamManager) *StateMachine {
+func newStateMachine(partitionID protocol.PartitionID, registry *protocol.ServiceRegistry, streams *streamManager) *StateMachine {
 	return &StateMachine{
 		partition: partitionID,
 		state:     protocol.NewStateMachine(registry),

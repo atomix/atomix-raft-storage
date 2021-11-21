@@ -16,7 +16,7 @@ limitations under the License.
 
 syntax = "proto3";
 
-package atomix.raft;
+package atomix.engine.raft;
 
 import "google/protobuf/timestamp.proto";
 import "gogoproto/gogo.proto";

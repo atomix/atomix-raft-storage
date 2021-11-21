@@ -1,4 +1,4 @@
-// Copyright 2019-present Open Networking Foundation.
+// Copyright 2021-present Open Networking Foundation.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package storage
+package engine
 
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	protocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
-	"github.com/atomix/atomix-raft-storage/pkg/storage/config"
+	"github.com/atomix/atomix-raft-storage/pkg/engine/config"
+	"github.com/atomix/atomix-sdk-go/pkg/cluster"
+	"github.com/atomix/atomix-sdk-go/pkg/engine/protocol/rsm"
+	"github.com/atomix/atomix-sdk-go/pkg/errors"
+	"github.com/atomix/atomix-sdk-go/pkg/logging"
 	"github.com/lni/dragonboat/v3"
 	raftconfig "github.com/lni/dragonboat/v3/config"
 	"github.com/lni/dragonboat/v3/statemachine"
@@ -37,8 +37,8 @@ var log = logging.GetLogger("atomix", "raft")
 func NewProtocol(config config.ProtocolConfig) *Protocol {
 	protocol := &Protocol{
 		config:  config,
-		clients: make(map[protocol.PartitionID]*Partition),
-		servers: make(map[protocol.PartitionID]*Server),
+		clients: make(map[rsm.PartitionID]*Partition),
+		servers: make(map[rsm.PartitionID]*Server),
 	}
 	protocol.listener = &raftEventListener{
 		protocol:  protocol,
@@ -49,12 +49,12 @@ func NewProtocol(config config.ProtocolConfig) *Protocol {
 
 // Protocol is an implementation of the Client interface providing the Raft consensus protocol
 type Protocol struct {
-	protocol.Protocol
+	rsm.Protocol
 	config          config.ProtocolConfig
 	mu              sync.RWMutex
 	replicas        []*cluster.Replica
-	clients         map[protocol.PartitionID]*Partition
-	servers         map[protocol.PartitionID]*Server
+	clients         map[rsm.PartitionID]*Partition
+	servers         map[rsm.PartitionID]*Server
 	memberIDs       map[uint64]string
 	nodeIDs         map[string]uint64
 	memberAddresses map[uint64]string
@@ -159,7 +159,7 @@ func (p *Protocol) getAPIAddresses() map[uint64]string {
 }
 
 // Start starts the Raft protocol
-func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
+func (p *Protocol) Start(c cluster.Cluster, registry *rsm.ServiceRegistry) error {
 	member, ok := c.Member()
 	if !ok {
 		return errors.NewInternal("local member not configured")
@@ -207,10 +207,10 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 
 	fsmFactory := func(clusterID, nodeID uint64) statemachine.IStateMachine {
 		streams := newStreamManager()
-		fsm := newStateMachine(c, protocol.PartitionID(clusterID), registry, streams)
+		fsm := newStateMachine(rsm.PartitionID(clusterID), registry, streams)
 		client := newPartition(p, clusterID, nodeID, node, streams)
 		p.mu.Lock()
-		p.clients[protocol.PartitionID(clusterID)] = client
+		p.clients[rsm.PartitionID(clusterID)] = client
 		p.mu.Unlock()
 		return fsm
 	}
@@ -253,7 +253,7 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 			return err
 		}
 		p.mu.Lock()
-		p.servers[protocol.PartitionID(partition.ID())] = server
+		p.servers[rsm.PartitionID(partition.ID())] = server
 		p.mu.Unlock()
 	}
 
@@ -269,7 +269,7 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 					close(startedCh)
 					started = true
 				}
-				partition := p.clients[protocol.PartitionID(leader.LeaderUpdated.Partition)]
+				partition := p.clients[rsm.PartitionID(leader.LeaderUpdated.Partition)]
 				partition.updateConfig(leader.LeaderUpdated.Leader)
 			}
 		}
@@ -279,19 +279,19 @@ func (p *Protocol) Start(c cluster.Cluster, registry *protocol.Registry) error {
 }
 
 // Partition returns the given partition client
-func (p *Protocol) Partition(partitionID protocol.PartitionID) protocol.Partition {
+func (p *Protocol) Partition(partitionID rsm.PartitionID) rsm.Partition {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.clients[partitionID]
 }
 
 // Partitions returns all partition clients
-func (p *Protocol) Partitions() []protocol.Partition {
+func (p *Protocol) Partitions() []rsm.Partition {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	partitions := make([]protocol.Partition, len(p.clients))
+	partitions := make([]rsm.Partition, len(p.clients))
 	for i := 0; i < len(p.clients); i++ {
-		partitions[i] = p.clients[protocol.PartitionID(i+1)]
+		partitions[i] = p.clients[rsm.PartitionID(i+1)]
 	}
 	return partitions
 }
@@ -306,3 +306,5 @@ func (p *Protocol) Stop() error {
 	}
 	return returnErr
 }
+
+var _ rsm.Protocol = (*Protocol)(nil)

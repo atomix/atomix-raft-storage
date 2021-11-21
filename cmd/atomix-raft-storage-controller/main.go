@@ -20,8 +20,8 @@ import (
 	core "github.com/atomix/atomix-controller/pkg/apis/core/v2beta1"
 	primitives "github.com/atomix/atomix-controller/pkg/apis/primitives/v2beta1"
 	logutil "github.com/atomix/atomix-controller/pkg/controller/util/log"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	storagev2beta2 "github.com/atomix/atomix-raft-storage/pkg/controller/storage/v2beta2"
+	"github.com/atomix/atomix-sdk-go/pkg/logging"
 
 	"os"
 	"runtime"

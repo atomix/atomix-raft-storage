@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package storage
+package engine
 
 import (
-	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
+	streams "github.com/atomix/atomix-sdk-go/pkg/stream"
 	"sync"
 )
 

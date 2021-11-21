@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package storage
+package engine
 
 import (
 	"github.com/lni/dragonboat/v3"
