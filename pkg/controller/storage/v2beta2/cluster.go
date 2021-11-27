@@ -765,16 +765,12 @@ func getClusterHeadlessServiceName(cluster *storagev2beta2.MultiRaftCluster) str
 // GetClusterDomain returns Kubernetes cluster domain, default to "cluster.local"
 func getClusterDomain() string {
 	apiSvc := "kubernetes.default.svc"
-
 	cname, err := net.LookupCNAME(apiSvc)
 	if err != nil {
 		defaultClusterDomain := "cluster.local"
 		return defaultClusterDomain
 	}
-
-	clusterDomain := strings.TrimPrefix(cname, apiSvc)
-	clusterDomain = strings.TrimSuffix(clusterDomain, ".")
-	return clusterDomain
+	return strings.TrimPrefix(cname, apiSvc + ".")
 }
 
 // getPodDNSName returns the fully qualified DNS name for the given pod ID
