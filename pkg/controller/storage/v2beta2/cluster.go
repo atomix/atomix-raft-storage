@@ -30,12 +30,14 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/pointer"
+	"net"
 	"os"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"strings"
 	"time"
 
 	storagev2beta2 "github.com/atomix/atomix-raft-storage/pkg/apis/storage/v2beta2"
@@ -760,13 +762,20 @@ func getClusterHeadlessServiceName(cluster *storagev2beta2.MultiRaftCluster) str
 	return getClusterResourceName(cluster, headlessServiceSuffix)
 }
 
+// GetClusterDomain returns Kubernetes cluster domain, default to "cluster.local"
+func getClusterDomain() string {
+	apiSvc := "kubernetes.default.svc"
+	cname, err := net.LookupCNAME(apiSvc)
+	if err != nil {
+		defaultClusterDomain := "cluster.local"
+		return defaultClusterDomain
+	}
+	return strings.TrimPrefix(cname, apiSvc + ".")
+}
+
 // getPodDNSName returns the fully qualified DNS name for the given pod ID
 func getPodDNSName(cluster *storagev2beta2.MultiRaftCluster, podID int) string {
-	domain := os.Getenv(clusterDomainEnv)
-	if domain == "" {
-		domain = "cluster.local"
-	}
-	return fmt.Sprintf("%s-%d.%s.%s.svc.%s", cluster.Name, podID, getClusterHeadlessServiceName(cluster), cluster.Namespace, domain)
+	return fmt.Sprintf("%s-%d.%s.%s.svc.%s", cluster.Name, podID, getClusterHeadlessServiceName(cluster), cluster.Namespace, getClusterDomain())
 }
 
 // newClusterLabels returns the labels for the given cluster
