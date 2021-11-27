@@ -771,7 +771,7 @@ func getClusterDomain() string {
 		if err != nil {
 			return "cluster.local"
 		}
-		clusterDomain = strings.TrimPrefix(cname, apiSvc+".")
+		clusterDomain = strings.TrimSuffix(strings.TrimPrefix(cname, apiSvc + "."), ".")
 	}
 	return clusterDomain
 }
