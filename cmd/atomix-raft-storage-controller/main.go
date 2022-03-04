@@ -44,7 +44,7 @@ func printVersion() {
 }
 
 func main() {
-	logging.SetLevel(logging.DebugLevel)
+	logging.SetLevel(logging.InfoLevel)
 	logf.SetLogger(logutil.NewControllerLogger("atomix", "controller", "raft"))
 
 	var namespace string
