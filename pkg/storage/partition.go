@@ -16,6 +16,7 @@ package storage
 
 import (
 	"context"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
@@ -134,12 +135,12 @@ func (c *Partition) SyncCommand(ctx context.Context, input []byte, stream stream
 	}
 	bytes, err := proto.Marshal(entry)
 	if err != nil {
-		return err
+		return errors.NewInvalid("failed to marshal entry", err)
 	}
 	ctx, cancel := context.WithTimeout(ctx, clientTimeout)
 	defer cancel()
 	if _, err := c.node.SyncPropose(ctx, c.node.GetNoOPSession(c.clusterID), bytes); err != nil {
-		return err
+		return wrapError(err)
 	}
 	return nil
 }
@@ -153,7 +154,7 @@ func (c *Partition) SyncQuery(ctx context.Context, input []byte, stream streams.
 	ctx, cancel := context.WithTimeout(ctx, clientTimeout)
 	defer cancel()
 	if _, err := c.node.SyncRead(ctx, c.clusterID, query); err != nil {
-		return err
+		return wrapError(err)
 	}
 	return nil
 }
@@ -165,9 +166,47 @@ func (c *Partition) StaleQuery(ctx context.Context, input []byte, stream streams
 		stream: stream,
 	}
 	if _, err := c.node.StaleRead(c.clusterID, query); err != nil {
-		return err
+		return wrapError(err)
 	}
 	return nil
+}
+
+func wrapError(err error) error {
+	switch err {
+	case dragonboat.ErrClusterNotFound,
+		dragonboat.ErrClusterNotBootstrapped,
+		dragonboat.ErrClusterNotInitialized,
+		dragonboat.ErrClusterNotReady,
+		dragonboat.ErrClusterClosed:
+		return errors.NewUnavailable(err.Error())
+	case dragonboat.ErrSystemBusy,
+		dragonboat.ErrBadKey:
+		return errors.NewUnavailable(err.Error())
+	case dragonboat.ErrClosed,
+		dragonboat.ErrNodeRemoved:
+		return errors.NewUnavailable(err.Error())
+	case dragonboat.ErrInvalidSession,
+		dragonboat.ErrInvalidTarget,
+		dragonboat.ErrInvalidAddress,
+		dragonboat.ErrInvalidOperation:
+		return errors.NewInvalid(err.Error())
+	case dragonboat.ErrPayloadTooBig,
+		dragonboat.ErrTimeoutTooSmall:
+		return errors.NewForbidden(err.Error())
+	case dragonboat.ErrDeadlineNotSet,
+		dragonboat.ErrInvalidDeadline:
+		return errors.NewInternal(err.Error())
+	case dragonboat.ErrDirNotExist:
+		return errors.NewInternal(err.Error())
+	case dragonboat.ErrTimeout:
+		return errors.NewTimeout(err.Error())
+	case dragonboat.ErrCanceled:
+		return errors.NewCanceled(err.Error())
+	case dragonboat.ErrRejected:
+		return errors.NewForbidden(err.Error())
+	default:
+		return errors.NewUnknown(err.Error())
+	}
 }
 
 var _ rsm.Partition = &Partition{}
