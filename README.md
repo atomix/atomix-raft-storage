@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # raft-storage-plugin
 [![Build Status](https://travis-ci.com/atomix/atomix-raft-storage.svg?branch=master)](https://travis-ci.com/atomix/atomix-raft-storage)
 [![Go Report Card](https://goreportcard.com/badge/github.com/atomix/atomix-raft-storage)](https://goreportcard.com/report/github.com/atomix/atomix-raft-storage)

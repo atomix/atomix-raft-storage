@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+
 export CGO_ENABLED=0
 export GO111MODULE=on
 
@@ -21,17 +25,20 @@ deps: # @HELP ensure that the required dependencies are in place
 	go build -v ./...
 
 test: # @HELP run the unit tests and source code validation
-test: build license_check linters
+test: build license linters
 	go test github.com/atomix/atomix-raft-storage/...
 
 coverage: # @HELP generate unit test coverage data
-coverage: build linters license_check
+coverage: build license linters
 
 linters: # @HELP examines Go source code and reports coding problems
 	GOGC=50 golangci-lint run
 
-license_check: # @HELP examine and ensure license headers exist
-	./build/bin/license-check
+reuse-tool: # @HELP install reuse if not present
+	command -v reuse || python3 -m pip install reuse
+
+license: reuse-tool # @HELP run license checks
+	reuse lint
 
 proto: # @HELP build Protobuf/gRPC generated types
 proto:
