@@ -6,7 +6,14 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
@@ -23,16 +30,33 @@ import (
 	"github.com/atomix/atomix-raft-storage/pkg/storage/config"
 	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
-	"io/ioutil"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 const monitoringPort = 5000
 
+var (
+	logLevel = flag.String("log_level", "INFO", "Set the log level (DEBUG, INFO, WARN, ERROR)")
+)
+
+func stringToLogLevel(l string) logging.Level {
+	switch strings.ToLower(l) {
+	case "debug":
+		return logging.DebugLevel
+	case "info":
+		return logging.InfoLevel
+	case "warn":
+		return logging.WarnLevel
+	case "error":
+		return logging.ErrorLevel
+
+	default:
+		return logging.InfoLevel
+	}
+}
+
 func main() {
-	logging.SetLevel(logging.DebugLevel)
+	flag.Parse()
+	logging.SetLevel(stringToLogLevel(*logLevel))
 
 	nodeID := os.Args[1]
 	protocolConfig := parseProtocolConfig()

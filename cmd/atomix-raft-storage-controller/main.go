@@ -6,7 +6,10 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"strings"
+
 	core "github.com/atomix/atomix-controller/pkg/apis/core/v2beta1"
 	primitives "github.com/atomix/atomix-controller/pkg/apis/primitives/v2beta1"
 	logutil "github.com/atomix/atomix-controller/pkg/controller/util/log"
@@ -26,6 +29,26 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
+var (
+	logLevel = flag.String("log_level", "INFO", "Set the log level (DEBUG, INFO, WARN, ERROR)")
+)
+
+func stringToLogLevel(l string) logging.Level {
+	switch strings.ToLower(l) {
+	case "debug":
+		return logging.DebugLevel
+	case "info":
+		return logging.InfoLevel
+	case "warn":
+		return logging.WarnLevel
+	case "error":
+		return logging.ErrorLevel
+
+	default:
+		return logging.InfoLevel
+	}
+}
+
 var log = logging.GetLogger("main")
 
 func printVersion() {
@@ -34,7 +57,8 @@ func printVersion() {
 }
 
 func main() {
-	logging.SetLevel(logging.InfoLevel)
+	flag.Parse()
+	logging.SetLevel(stringToLogLevel(*logLevel))
 	logf.SetLogger(logutil.NewControllerLogger("atomix", "controller", "raft"))
 
 	var namespace string
