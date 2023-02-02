@@ -5,7 +5,14 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"os"
+	"os/signal"
+	"strconv"
+	"strings"
+	"syscall"
+
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver"
@@ -21,15 +28,31 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/set"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/value"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	"os"
-	"os/signal"
-	"strconv"
-	"strings"
-	"syscall"
 )
 
+var (
+	logLevel = flag.String("log_level", "INFO", "Set the log level (DEBUG, INFO, WARN, ERROR)")
+)
+
+func stringToLogLevel(l string) logging.Level {
+	switch strings.ToLower(l) {
+	case "debug":
+		return logging.DebugLevel
+	case "info":
+		return logging.InfoLevel
+	case "warn":
+		return logging.WarnLevel
+	case "error":
+		return logging.ErrorLevel
+
+	default:
+		return logging.InfoLevel
+	}
+}
+
 func main() {
-	logging.SetLevel(logging.DebugLevel)
+	flag.Parse()
+	logging.SetLevel(stringToLogLevel(*logLevel))
 
 	address := os.Args[1]
 	parts := strings.Split(address, ":")
